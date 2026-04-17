@@ -1,0 +1,12 @@
+﻿{
+  "profiles": {
+    "Blue (Package)": {
+      "commandName": "MsixPackage",
+      "nativeDebugging": true
+    },
+    "Blue (Unpackaged)": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}
