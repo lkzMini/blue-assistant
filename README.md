@@ -147,5 +147,7 @@ CubeKit.UI/     UI support library
 
 ## License
 
-MIT  
-See [LICENSE.txt](./LICENSE.txt).
+This project is licensed under the GNU GPLv3.
+
+You are free to use, study, modify, and share this project.
+If you distribute modified versions, you must also provide them under GPLv3 and keep the source available under the same license.
