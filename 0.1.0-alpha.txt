@@ -1,0 +1,20 @@
+## Blue Assistant v0.1.0-alpha
+
+First public tester build of Blue Assistant.
+
+### Included
+- Floating desktop companion UI
+- Local chat through Ollama
+- Basic character states
+- Basic collapse / expand behavior
+
+### Requirements
+- Windows 10/11
+- Ollama installed locally
+- `phi3:latest` available
+
+### Installation
+Download the ZIP, extract it, and run `install.ps1`.
+
+### Notes
+This is an early alpha build intended for testing and feedback.
