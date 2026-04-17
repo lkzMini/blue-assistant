@@ -145,6 +145,12 @@ Clippy/         Main desktop app
 CubeKit.UI/     UI support library
 ```
 
+## Support the project
+
+If you like Blue Assistant and want to support its development, you can help through the repository sponsor links.
+
+Your support helps with testing, packaging, polishing the app, and future improvements.
+
 ## License
 
 This project is licensed under the GNU GPLv3.
