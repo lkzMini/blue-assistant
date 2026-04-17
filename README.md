@@ -4,6 +4,10 @@ A floating desktop assistant for Windows powered by a local LLM through Ollama.
 
 > Current status: personal alpha/beta build shared for testing.
 
+## Preview
+
+![Blue Assistant preview](./Clippy/Assets/image.png)
+
 ## What is Blue?
 
 Blue is a lightweight desktop companion built with WinUI.
