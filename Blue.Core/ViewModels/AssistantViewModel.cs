@@ -55,8 +55,27 @@ namespace Blue.Core.ViewModels
             ChatService = chatService;
             SettingsService = settingsService;
             isPinned = SettingsService.AutoPin;
-			SetupChat();
+			_ = InitializeAsync();
         }
+
+		private async Task InitializeAsync()
+		{
+			SetupChat();
+			await CheckOllamaOnStartup();
+		}
+
+		public async Task<bool> CheckOllamaOnStartup()
+		{
+			var ollamaRunning = await ChatService.HealthCheckAsync();
+			if (!ollamaRunning)
+			{
+				AddMessage(new Message(Role.System,
+					"⚠️ Ollama is not running or not reachable. "
+					+ "Make sure Ollama is installed and running, then try:\n"
+					+ "  ollama pull phi3:latest"));
+			}
+			return ollamaRunning;
+		}
 
 		private void SetupChat()
 		{
@@ -172,7 +191,7 @@ namespace Blue.Core.ViewModels
 
 			if (ContainsIgnoreCase(message, "404") || ContainsIgnoreCase(message, "not found") || ContainsIgnoreCase(message, "model"))
 			{
-				return $"I couldn't use the required local Ollama model `{RequiredOllamaModel}`. Open a terminal and run `ollama pull {RequiredOllamaModel}`, then try again.";
+				return $"I couldn't find the model '{RequiredOllamaModel}'. Open a terminal and run:\n  ollama pull {RequiredOllamaModel}\nThen try again.";
 			}
 
 			if (exception is HttpRequestException ||
@@ -180,10 +199,10 @@ namespace Blue.Core.ViewModels
 				ContainsIgnoreCase(message, "refused") ||
 				ContainsIgnoreCase(message, "unreachable"))
 			{
-				return $"I couldn't connect to Ollama at {OllamaEndpoint}. Make sure Ollama is installed and running, then run `ollama pull {RequiredOllamaModel}` before chatting with Blue.";
+				return $"I can't reach Ollama at {OllamaEndpoint}.\n\nCheck that Ollama is running (look for Ollama in your system tray or taskbar).\nIf it's not running, open a terminal and run:\n  ollama serve\n\nThen make sure the model is installed:\n  ollama pull {RequiredOllamaModel}";
 			}
 
-			return $"I couldn't get a response from Ollama. Make sure Ollama is running at {OllamaEndpoint} and the `{RequiredOllamaModel}` model is installed.";
+			return $"I couldn't get a response from Ollama. Make sure Ollama is running at {OllamaEndpoint} and the '{RequiredOllamaModel}' model is installed.";
 		}
 
 		private static bool ContainsIgnoreCase(string source, string value) =>

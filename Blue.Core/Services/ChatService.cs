@@ -19,7 +19,23 @@ namespace Blue.Core.Services
 
         public ChatService()
         {
-            _httpClient = new HttpClient();
+            _httpClient = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(5)
+            };
+        }
+
+        public async Task<bool> HealthCheckAsync()
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"{_ollamaEndpoint}/api/tags");
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public Task<string> SendChatAsync(IEnumerable<IMessage> messages)

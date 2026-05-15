@@ -129,19 +129,16 @@ namespace Blue
         {
             if (m_window is null) return;
 
-            m_window.DispatcherQueue.TryEnqueue(() =>
+            m_window.DispatcherQueue.TryEnqueue(async () =>
             {
-                var vm = Services.GetService<AssistantViewModel>();
-                if (vm is null) return;
+                var viewModel = Services.GetService<AssistantViewModel>();
+                if (viewModel is null) return;
 
                 switch (action)
                 {
                     case TrayMenuAction.ShowHide:
-                        // Toggle window visibility
                         if (m_window.Visible)
-                        {
                             m_window.Hide();
-                        }
                         else
                         {
                             m_window.Show();
@@ -151,18 +148,13 @@ namespace Blue
                         break;
 
                     case TrayMenuAction.TogglePin:
-                        // Toggle pin state
-                        vm.IsPinned = !vm.IsPinned;
-                        _trayService.IsPinned = vm.IsPinned;
+                        viewModel.IsPinned = !viewModel.IsPinned;
+                        _trayService.IsPinned = viewModel.IsPinned;
                         break;
 
                     case TrayMenuAction.RestartChat:
-                        // Execute refresh chat command
-                        if (vm.RefreshChatCommand.CanExecute(null))
-                        {
-                            vm.RefreshChatCommand.Execute(null);
-                        }
-                        // Show window when restarting chat
+                        if (viewModel.RefreshChatCommand.CanExecute(null))
+                            viewModel.RefreshChatCommand.Execute(null);
                         m_window.Show();
                         m_window.Activate();
                         m_window.BringToFront();
@@ -170,6 +162,13 @@ namespace Blue
 
                     case TrayMenuAction.OpenSettings:
                         OpenSettings();
+                        break;
+
+                    case TrayMenuAction.CheckOllama:
+                        m_window.Show();
+                        m_window.Activate();
+                        m_window.BringToFront();
+                        await viewModel.CheckOllamaOnStartup();
                         break;
 
                     case TrayMenuAction.Exit:

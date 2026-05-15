@@ -13,5 +13,6 @@ namespace Blue.Core.Services
 	{
 		Task<string> SendChatAsync(IEnumerable<IMessage> Messages);
 		IAsyncEnumerable<string> StreamChatAsync(IEnumerable<IMessage> Messages, CancellationToken cancellationToken = default);
+		Task<bool> HealthCheckAsync();
 	}
 }
