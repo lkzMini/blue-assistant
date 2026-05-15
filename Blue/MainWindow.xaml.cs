@@ -52,7 +52,7 @@ namespace Blue
     public sealed partial class MainWindow : WindowEx
     {
         private SettingsService Settings = (SettingsService)App.Current.Services.GetService<ISettingsService>();
-        private ClippyViewModel Blue = App.Current.Services.GetService<ClippyViewModel>();
+        private AssistantViewModel Assistant = App.Current.Services.GetService<AssistantViewModel>();
         WindowMessageMonitor m;
         private bool isMovePointerPressed;
         private bool isMovingWindow;
@@ -126,11 +126,10 @@ namespace Blue
             m = new(this);
             unsafe
             {
-
-				var hwnd = (HWND)this.GetWindowHandle();
-				int lExStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
-				SetWindowLong(hwnd, GWL_EXSTYLE, lExStyle | WS_EX_LAYERED);
-			}
+                var hwnd = (HWND)this.GetWindowHandle();
+                int lExStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+                SetWindowLong(hwnd, GWL_EXSTYLE, lExStyle | WS_EX_LAYERED);
+            }
             m.WindowMessageReceived += WindowMessageReceived;
 
             SystemBackdrop = new TransparentBackdrop();
@@ -139,20 +138,20 @@ namespace Blue
 
             KeyboardListener.Setup(this);
 
-            Blue.isExpanded = false;
+            Assistant.IsExpanded = false;
             Collapse();
 
             this.BringToFront();
-			if (Blue.IsPinned) Pin();
-			else Unpin();
-			Blue.PropertyChanged += (object sender, System.ComponentModel.PropertyChangedEventArgs e) =>
+            if (Assistant.IsPinned) Pin();
+            else Unpin();
+            Assistant.PropertyChanged += (object sender, System.ComponentModel.PropertyChangedEventArgs e) =>
             {
-                if(e.PropertyName == "IsPinned")
+                if (e.PropertyName == "IsPinned")
                 {
-                    if (Blue.IsPinned) Pin();
+                    if (Assistant.IsPinned) Pin();
                     else Unpin();
                 }
-			};
+            };
         }
 
         private void ConfigureFloatingWindowChrome()
@@ -202,6 +201,12 @@ namespace Blue
                 e.Handled = true;
                 e.Result = 1;
             }
+
+            // Forward tray icon callback messages
+            App.Current.TrayService.HandleWindowMessage(
+                e.Message.MessageId,
+                e.Message.WParam,
+                e.Message.LParam);
         }
 
         private double GetScale()
@@ -224,10 +229,6 @@ namespace Blue
         }
 
         private Visibility BtoV(bool b) => b ? Visibility.Visible : Visibility.Collapsed;
-
-        private void Clippy_Checked(object sender, RoutedEventArgs e) => Expand();
-
-        private void Clippy_Unchecked(object sender, RoutedEventArgs e) => Collapse();
 
         private void Collapse()
         {
@@ -510,8 +511,8 @@ namespace Blue
                 return;
             }
 
-            Blue.isExpanded = !Blue.isExpanded;
-            if (Blue.isExpanded)
+            Assistant.IsExpanded = !Assistant.IsExpanded;
+            if (Assistant.IsExpanded)
                 Expand();
             else
                 Collapse();
@@ -595,21 +596,17 @@ namespace Blue
             e.Handled = true;
 
             if (sender is TextBox textBox)
-                Blue.CurrentText = textBox.Text;
+                Assistant.CurrentText = textBox.Text;
 
-            if (!Blue.SendPromptCommand.IsRunning && Blue.SendPromptCommand.CanExecute(null))
-                Blue.SendPromptCommand.Execute(null);
-		}
-
-		private void TextBox_KeyUp(object sender, KeyRoutedEventArgs e)
-		{
+            if (!Assistant.SendPromptCommand.IsRunning && Assistant.SendPromptCommand.CanExecute(null))
+                Assistant.SendPromptCommand.Execute(null);
 		}
 
 		private void Exit_Click(object sender, RoutedEventArgs e) => Application.Current.Exit();
 
 		private void Hide_Click(object sender, RoutedEventArgs e)
 		{
-            Blue.isExpanded = false;
+            Assistant.IsExpanded = false;
             Collapse();
             Activate();
 		}

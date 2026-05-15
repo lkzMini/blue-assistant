@@ -1,81 +1,106 @@
 using Blue.Core.Services;
-using Blue.Helpers;
 using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Windows.Storage;
+using System.IO;
+using System.Text.Json;
 
-namespace Blue.Services
+namespace Blue.Services;
+
+public class SettingsService : ObservableObject, ISettingsService
 {
-    public class SettingsService : ObservableObject, ISettingsService
+    private readonly string _settingsPath;
+    private Dictionary<string, object?> _values;
+
+    public SettingsService()
     {
-        private static ApplicationDataContainer Settings = ApplicationData.Current.LocalSettings;
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var dir = Path.Combine(appData, "Blue");
+        Directory.CreateDirectory(dir);
+        _settingsPath = Path.Combine(dir, "settings.json");
+        _values = Load();
+    }
 
-        private bool autoPin = (bool)(Settings.Values["AutoPin"] ?? true);
-        public bool AutoPin
+    private Dictionary<string, object?> Load()
+    {
+        try
         {
-            get => autoPin;
-            set
+            if (File.Exists(_settingsPath))
             {
-                Settings.Values["AutoPin"] = value;
-                SetProperty(ref autoPin, value);
+                var json = File.ReadAllText(_settingsPath);
+                return JsonSerializer.Deserialize<Dictionary<string, object?>>(json) ?? new();
             }
         }
-
-        private bool enableTray = (bool)(Settings.Values["enableTray"] ?? true);
-        public bool enableTray
+        catch
         {
-            get => enableTray;
-            set
-            {
-                Settings.Values["enableTray"] = value;
-                SetProperty(ref enableTray, value);
-                //if (value)
-                   // ClippyTrayListener.Recreate();
-               // else
-                    // ClippyTrayListener.Remove();
-            }
+            // Corrupt file — start fresh
         }
+        return new Dictionary<string, object?>();
+    }
 
-        private bool translucentBackground = (bool)(Settings.Values["TranslucentBackground"] ?? true);
-        public bool TranslucentBackground
+    private void Save()
+    {
+        try
         {
-            get => translucentBackground;
-            set
-            {
-                Settings.Values["TranslucentBackground"] = value;
-                SetProperty(ref translucentBackground, value);
-            }
+            var json = JsonSerializer.Serialize(_values, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(_settingsPath, json);
         }
+        catch
+        {
+            // Best-effort save
+        }
+    }
 
-        private int tokens = (int)(Settings.Values["Tokens"] ?? 100);
-        public int Tokens
+    private T Get<T>(string key, T defaultValue)
+    {
+        if (_values.TryGetValue(key, out var val) && val is JsonElement je)
         {
-            get => tokens;
-            set
-            {
-                if (value > 50 && value < 2000)
-                {
-                    Settings.Values["Tokens"] = value;
-                    SetProperty(ref tokens, value);
-                }
-                else
-                    SetProperty(ref tokens, 100);
-            }
+            try { return JsonSerializer.Deserialize<T>(je.GetRawText())!; }
+            catch { }
         }
+        return defaultValue;
+    }
 
-        private bool keyboardEnabled = (bool)(Settings.Values["KeyboardEnabled"] ?? true);
-        public bool KeyboardEnabled
+    private void Set<T>(string key, T value)
+    {
+        _values[key] = value;
+        Save();
+    }
+
+    public bool AutoPin
+    {
+        get => Get("AutoPin", true);
+        set { Set("AutoPin", value); OnPropertyChanged(); }
+    }
+
+    public bool EnableTray
+    {
+        get => Get("enableTray", true);
+        set { Set("enableTray", value); OnPropertyChanged(); }
+    }
+
+    public bool TranslucentBackground
+    {
+        get => Get("TranslucentBackground", true);
+        set { Set("TranslucentBackground", value); OnPropertyChanged(); }
+    }
+
+    public int Tokens
+    {
+        get => Get("Tokens", 100);
+        set
         {
-            get => keyboardEnabled;
-            set
-            {
-                Settings.Values["KeyboardEnabled"] = value;
-                SetProperty(ref keyboardEnabled, value);
-            }
+            if (value > 50 && value < 2000)
+                Set("Tokens", value);
+            else
+                Set("Tokens", 100);
+            OnPropertyChanged();
         }
+    }
+
+    public bool KeyboardEnabled
+    {
+        get => Get("KeyboardEnabled", true);
+        set { Set("KeyboardEnabled", value); OnPropertyChanged(); }
     }
 }

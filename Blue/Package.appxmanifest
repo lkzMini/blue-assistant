@@ -9,7 +9,7 @@
   IgnorableNamespaces="uap rescap mp">
 
   <Identity
-    Name="2505FireCubeStudios.Clippy11"
+    Name="Minisaurr.BlueAssistant"
     Publisher="CN=Minisaurr"
     Version="0.0.1.0" />
 
@@ -35,7 +35,7 @@
       <Extensions>
         <uap5:Extension Category="windows.startupTask">
           <uap5:StartupTask
-            TaskId="ClippyStartupTaskId"
+            TaskId="BlueStartupTaskId"
             DisplayName="Blue"
             Enabled="true"/>
         </uap5:Extension>

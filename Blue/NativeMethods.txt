@@ -1,4 +1,9 @@
 ﻿WINDOW_EX_STYLE
 GetWindowLong
-WM_ERASEBKGND
 SetWindowLong
+WM_ERASEBKGND
+Shell_NotifyIconW
+NOTIFYICONDATAW
+LoadIconW
+DestroyIcon
+LoadImageW

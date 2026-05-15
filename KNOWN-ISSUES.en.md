@@ -32,4 +32,4 @@ These do not currently block normal use.
 - Optional real tray behavior
 - Further warning cleanup
 - UI modernization where it is truly worth it
-- Possible internal cleanup of old `Clippy` identifiers
+- ✅ Legacy `Clippy` identifiers have been cleaned up and replaced with `Blue` branding

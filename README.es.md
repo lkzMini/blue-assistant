@@ -37,9 +37,9 @@ Si Ollama no está corriendo, o si `phi3:latest` no existe, Blue mostrará un me
 Blue espera exactamente estos archivos:
 
 ```text
-Clippy/Assets/Dino/Dino.png
-Clippy/Assets/Dino/Dino.Idle.png
-Clippy/Assets/Dino/Dino.Happy.png
+Blue/Assets/Dino/Dino.png
+Blue/Assets/Dino/Dino.Idle.png
+Blue/Assets/Dino/Dino.Happy.png
 ```
 
 Mapa de estados:

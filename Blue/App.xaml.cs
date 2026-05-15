@@ -20,112 +20,125 @@ using Blue.Core.ViewModels;
 using Blue.Core.Services;
 using Blue.Services;
 using System.Threading.Tasks;
-using System.Runtime.ExceptionServices;
 using WinUIEx;
 using Blue.Tray;
 using System.Threading;
-
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
+using Microsoft.UI;
+using WinRT.Interop;
 
 namespace Blue
 {
-    /// <summary>
-    /// Provides application-specific behavior to supplement the default Application class.
-    /// </summary>
     public partial class App : Application
-	{
-		private const string MutexID = "Clippy2025Mutex";
-		private static Mutex? SingleInstanceMutex;
+    {
+        private const string MutexID = "BlueAssistantMutex";
+        private static Mutex? SingleInstanceMutex;
 
-		/// <summary>
-		/// Gets the current <see cref="App"/> instance in use
-		/// </summary>
-		public new static App Current => (App)Application.Current;
+        public new static App Current => (App)Application.Current;
+        internal TrayService TrayService => _trayService;
 
-        /// <summary>
-        /// Gets the <see cref="IServiceProvider"/> instance to resolve application services.
-        /// </summary>
         public IServiceProvider Services { get; }
 
-        /// <summary>
-        /// Initializes the singleton application object.  This is the first line of authored code
-        /// executed, and as such is the logical equivalent of main() or WinMain().
-        /// </summary>
         public App()
         {
             Services = ConfigureServices();
             this.InitializeComponent();
             UnhandledException += OnUnhandledException;
             TaskScheduler.UnobservedTaskException += OnUnobservedException;
-            AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
+            CheckSingleInstance();
+        }
 
-			CheckSingleInstance();
-		}
+        private void CheckSingleInstance()
+        {
+            bool isNewInstance;
+            SingleInstanceMutex = new Mutex(true, MutexID, out isNewInstance);
+            if (!isNewInstance)
+                System.Environment.Exit(0);
+        }
 
-		private void CheckSingleInstance()
-		{
-			bool isNewInstance;
-			SingleInstanceMutex = new Mutex(true, MutexID, out isNewInstance);
-			if (!isNewInstance)
-				System.Environment.Exit(0);
-		}
-
-		private static IServiceProvider ConfigureServices()
+        private static IServiceProvider ConfigureServices()
         {
             var services = new ServiceCollection();
-
             services.AddSingleton<IChatService, ChatService>();
             services.AddSingleton<IKeyService, KeyService>();
             services.AddSingleton<ISettingsService, SettingsService>();
-            services.AddSingleton<ClippyViewModel>();
-
+            services.AddSingleton<AssistantViewModel>();
             return services.BuildServiceProvider();
         }
 
-        /// <summary>
-        /// Invoked when the application is launched normally by the end user.  Other entry points
-        /// will be used such as when the application is launched to open a specific file.
-        /// </summary>
-        /// <param name="args">Details about the launch request and process.</param>
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
-			if (AppInstance.GetActivatedEventArgs().Kind != ActivationKind.StartupTask)
-			{
-               ShowBlue();
-			}
+            // In unpackaged mode, AppInstance.GetActivatedEventArgs() throws COMException.
+            // Always show the main window regardless.
+            try
+            {
+                if (AppInstance.GetActivatedEventArgs().Kind != ActivationKind.StartupTask)
+                    ShowBlue();
+            }
+            catch
+            {
+                ShowBlue();
+            }
 
             TrayWindow = new TrayFlyoutWindow();
         }
 
         public void ShowBlue()
         {
-			if (m_window is null)
-				m_window = new MainWindow();
-			m_window.Activate();
+            if (m_window is null)
+            {
+                m_window = new MainWindow();
+                InitializeTray();
+            }
+            m_window.Activate();
             m_window.Show();
         }
 
+        private void InitializeTray()
+        {
+            try
+            {
+                if (m_window is null) return;
+
+                var hwnd = WindowNative.GetWindowHandle(m_window);
+                if (_trayService.Initialize(hwnd))
+                {
+                    _trayService.TrayLeftClick += OnTrayLeftClick;
+                }
+            }
+            catch
+            {
+                // Non-fatal — app works without tray
+            }
+        }
+
+        private void OnTrayLeftClick(object? sender, EventArgs e)
+        {
+            if (m_window is not null)
+            {
+                m_window.DispatcherQueue.TryEnqueue(() =>
+                {
+                    m_window.Activate();
+                    m_window.Show();
+                    m_window.BringToFront();
+                });
+            }
+        }
+
         public void OpenSettings()
-		{
-			if (s_window is null)
-				s_window = new SettingsWindow();
-			s_window.Activate();
-			s_window.Closed += (sender, e) => { s_window = null; };
-		}
+        {
+            if (s_window is null)
+                s_window = new SettingsWindow();
+            s_window.Activate();
+            s_window.Closed += (sender, e) => { s_window = null; };
+        }
 
         private MainWindow m_window;
+        private readonly TrayService _trayService = new();
+        private Window s_window;
+        private TrayFlyoutWindow TrayWindow = null!;
 
-		private Window s_window;
-
-        private TrayFlyoutWindow TrayWindow;
-
-		private static void OnUnobservedException(object? sender, UnobservedTaskExceptionEventArgs e) => e.SetObserved();
+        private static void OnUnobservedException(object? sender, UnobservedTaskExceptionEventArgs e) => e.SetObserved();
 
         private static void OnUnhandledException(object? sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e) => e.Handled = true;
-
-        private void CurrentDomain_FirstChanceException(object? sender, FirstChanceExceptionEventArgs e)
-        {
-        }
     }
 }

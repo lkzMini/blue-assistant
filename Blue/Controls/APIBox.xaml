@@ -6,10 +6,9 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
     xmlns:Icons="using:CubeKit.UI.Icons" 
-    xmlns:toolkit="using:CommunityToolkit.WinUI.UI.Controls"
+    xmlns:toolkit="using:CubeKit.UI.Controls.Toolkit"
     xmlns:ani="using:CommunityToolkit.WinUI.UI.Animations" 
-    xmlns:interactions="using:Microsoft.Xaml.Interactions.Core" 
-    xmlns:behaviors="using:CommunityToolkit.WinUI.UI.Behaviors"
+    xmlns:interactions="using:Microsoft.Xaml.Interactions.Core"
     mc:Ignorable="d">
     <UserControl.Resources>
         <LinearGradientBrush x:Name="AccentLinearGradientBrush" x:Key="AccentLinearGradientBrush" StartPoint="0,0" EndPoint="1,0">

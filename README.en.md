@@ -37,9 +37,9 @@ If Ollama is not running, or if `phi3:latest` is missing, Blue will show a setup
 Blue expects these exact files:
 
 ```text
-Clippy/Assets/Dino/Dino.png
-Clippy/Assets/Dino/Dino.Idle.png
-Clippy/Assets/Dino/Dino.Happy.png
+Blue/Assets/Dino/Dino.png
+Blue/Assets/Dino/Dino.Idle.png
+Blue/Assets/Dino/Dino.Happy.png
 ```
 
 State mapping:

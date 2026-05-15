@@ -3,7 +3,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:CubeKit.UI.Styles"
     xmlns:icons="using:CubeKit.UI.Icons" 
-    xmlns:ToolkitControls="using:CommunityToolkit.WinUI.UI.Controls">
+    xmlns:ToolkitControls="using:CubeKit.UI.Controls.Toolkit">
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="ms-appx:///CubeKit.UI/Styles/CubeThemeDictionary.xaml" />
     </ResourceDictionary.MergedDictionaries>

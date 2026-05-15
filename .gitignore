@@ -361,4 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-/Clippy/Tray
+/Blue/Tray
+
+# Blue backup snapshots
+/bluebackup/

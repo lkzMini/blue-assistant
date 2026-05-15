@@ -32,4 +32,4 @@ Actualmente no bloquean el uso normal.
 - Tray real opcional
 - Más limpieza de warnings
 - Modernización de UI donde realmente valga la pena
-- Posible limpieza interna de identificadores viejos de `Clippy`
+- Posible limpieza interna de identificadores viejos de `Blue`

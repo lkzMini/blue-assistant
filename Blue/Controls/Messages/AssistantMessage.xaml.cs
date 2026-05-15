@@ -1,7 +1,6 @@
 using Blue.Core.Services;
 using Blue.Core.ViewModels.Messages;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.WinUI.UI.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -24,7 +23,7 @@ using Windows.System;
 
 namespace Blue.Controls.Messages
 {
-    public sealed partial class ClippyMessage : UserControl
+    public sealed partial class AssistantMessage : UserControl
     {
 		public AssistantMessageViewModel ViewModel
 		{
@@ -41,7 +40,7 @@ namespace Blue.Controls.Messages
 			DependencyProperty.Register(
 				nameof(ViewModel),
 				typeof(AssistantMessageViewModel),
-				typeof(ClippyMessage),
+				typeof(AssistantMessage),
 				new PropertyMetadata(null));
 
 		public bool IsSendEnabled
@@ -53,7 +52,7 @@ namespace Blue.Controls.Messages
         public static readonly DependencyProperty IsSendEnabledProperty =
                    DependencyProperty.Register("IsSendEnabled", typeof(bool), typeof(UserMessage), null);
 
-        public ClippyMessage()
+        public AssistantMessage()
         {
             this.InitializeComponent();
         }

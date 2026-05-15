@@ -15,20 +15,27 @@ namespace Blue.Core.ViewModels.Messages
 		[ObservableProperty]
 		private bool isStreaming = false;
 
-		private StringBuilder _streamBuffer = new();   // Holds text waiting to be typed
+		private StringBuilder _streamBuffer = new();
 		private Task? _typingTask;
+		private CancellationTokenSource? _internalCts;
 		private string TotalText = "";
+
 		/// <summary>
 		/// Starts the typing animation loop.
 		/// </summary>
 		public void StartStreamText(CancellationToken cancellationToken, int batchSize = 3, int delayMs = 15)
 		{
 			IsStreaming = true;
+
+			// Create a linked CTS so EndStreamText can cancel the typing loop
+			_internalCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+			var internalToken = _internalCts.Token;
+
 			_typingTask = Task.Run(async () =>
 			{
 				try
 				{
-					while (!cancellationToken.IsCancellationRequested)
+					while (!internalToken.IsCancellationRequested)
 					{
 						if (_streamBuffer.Length >= batchSize)
 						{
@@ -37,15 +44,16 @@ namespace Blue.Core.ViewModels.Messages
 
 							UIThread?.Invoke(() => StreamingText += chunk);
 
-							await Task.Delay(delayMs, cancellationToken);
+							await Task.Delay(delayMs, internalToken);
 						}
 						else
 						{
-							await Task.Delay(10, cancellationToken); // Wait for more input
+							await Task.Delay(10, internalToken);
 						}
 					}
 				}
 				catch (TaskCanceledException) { }
+				catch (OperationCanceledException) { }
 			});
 		}
 
@@ -63,6 +71,11 @@ namespace Blue.Core.ViewModels.Messages
 		/// </summary>
 		public void EndStreamText()
 		{
+			// Cancel the internal typing loop first
+			_internalCts?.Cancel();
+			_internalCts?.Dispose();
+			_internalCts = null;
+
 			if (_streamBuffer.Length > 0)
 			{
 				StreamingText += _streamBuffer.ToString();

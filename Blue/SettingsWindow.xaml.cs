@@ -46,7 +46,7 @@ namespace Blue
 
 		private async void SetupStartup()
 		{
-			var startup = await StartupTask.GetAsync("ClippyStartupTaskId");
+			var startup = await StartupTask.GetAsync("BlueStartupTaskId");
 			UpdateToggleState(startup.State);
 		}
         private async void GitHub_Click(object sender, RoutedEventArgs e) => await Launcher.LaunchUriAsync(new Uri("https://github.com/Minisaurr"));
@@ -78,7 +78,7 @@ namespace Blue
 		private async void StartupToggle_Toggled(object sender, RoutedEventArgs e)
 		{
 			bool enable = StartupToggle.IsOn;
-			var startup = await StartupTask.GetAsync("ClippyStartupTaskId");
+			var startup = await StartupTask.GetAsync("BlueStartupTaskId");
 			StartupErrorText.Visibility = Visibility.Collapsed;
 			switch (startup.State)
 			{
