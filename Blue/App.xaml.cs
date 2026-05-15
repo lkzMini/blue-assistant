@@ -35,6 +35,7 @@ namespace Blue
 
         public new static App Current => (App)Application.Current;
         internal TrayService TrayService => _trayService;
+        public bool IsWindowVisible => m_window != null;
 
         public IServiceProvider Services { get; }
 
@@ -103,6 +104,7 @@ namespace Blue
                 if (_trayService.Initialize(hwnd))
                 {
                     _trayService.TrayLeftClick += OnTrayLeftClick;
+                    _trayService.TrayMenuClicked += OnTrayMenuClicked;
                 }
             }
             catch
@@ -122,6 +124,60 @@ namespace Blue
                     m_window.BringToFront();
                 });
             }
+        }
+
+        private void OnTrayMenuClicked(object? sender, TrayMenuAction action)
+        {
+            if (m_window is null) return;
+
+            m_window.DispatcherQueue.TryEnqueue(() =>
+            {
+                var vm = Services.GetService<AssistantViewModel>();
+                if (vm is null) return;
+
+                switch (action)
+                {
+                    case TrayMenuAction.ShowHide:
+                        // Toggle window visibility
+                        if (m_window.Visible)
+                        {
+                            m_window.Hide();
+                        }
+                        else
+                        {
+                            m_window.Show();
+                            m_window.Activate();
+                            m_window.BringToFront();
+                        }
+                        break;
+
+                    case TrayMenuAction.TogglePin:
+                        // Toggle pin state
+                        vm.IsPinned = !vm.IsPinned;
+                        _trayService.IsPinned = vm.IsPinned;
+                        break;
+
+                    case TrayMenuAction.RestartChat:
+                        // Execute refresh chat command
+                        if (vm.RefreshChatCommand.CanExecute(null))
+                        {
+                            vm.RefreshChatCommand.Execute(null);
+                        }
+                        // Show window when restarting chat
+                        m_window.Show();
+                        m_window.Activate();
+                        m_window.BringToFront();
+                        break;
+
+                    case TrayMenuAction.OpenSettings:
+                        OpenSettings();
+                        break;
+
+                    case TrayMenuAction.Exit:
+                        Application.Current.Exit();
+                        break;
+                }
+            });
         }
 
         public void OpenSettings()

@@ -144,12 +144,17 @@ namespace Blue
             this.BringToFront();
             if (Assistant.IsPinned) Pin();
             else Unpin();
+            // Sync initial pin state to TrayService
+            App.Current.TrayService.IsPinned = Assistant.IsPinned;
+
             Assistant.PropertyChanged += (object sender, System.ComponentModel.PropertyChangedEventArgs e) =>
             {
                 if (e.PropertyName == "IsPinned")
                 {
                     if (Assistant.IsPinned) Pin();
                     else Unpin();
+                    // Sync pin state to TrayService for tray menu context
+                    App.Current.TrayService.IsPinned = Assistant.IsPinned;
                 }
             };
         }
@@ -376,8 +381,6 @@ namespace Blue
             windowLeft = visibleCharacterPosition.X;
             windowTop = visibleCharacterPosition.Y;
 
-            Width = windowWidth;
-            Height = windowHeight;
             LayoutCanvas.Width = windowWidth;
             LayoutCanvas.Height = windowHeight;
             ChatPanel.Width = ChatWidth;
@@ -387,9 +390,12 @@ namespace Blue
             Canvas.SetLeft(CharacterButton, characterLeft);
             Canvas.SetTop(CharacterButton, characterTop);
 
-            AppWindow.ResizeClient(new SizeInt32(
-                Convert.ToInt32(Math.Ceiling(windowWidthPixels)),
-                Convert.ToInt32(Math.Ceiling(windowHeightPixels))));
+            // Use Width/Height instead of AppWindow.ResizeClient to avoid conflicts.
+            // Width/Height sets outer window size and WinUIEx handles it correctly,
+            // whereas ResizeClient sets client area causing misalignment.
+            Width = windowWidth;
+            Height = windowHeight;
+
             AppWindow.Move(new PointInt32(
                 Convert.ToInt32(windowLeft),
                 Convert.ToInt32(windowTop)));
@@ -400,22 +406,26 @@ namespace Blue
         {
             var scale = GetScale();
 
-            if (CharacterButton is not null && CharacterButton.ActualWidth > 0 && CharacterButton.ActualHeight > 0)
+            if (CharacterButton is not null)
             {
-                try
-                {
-                    var relative = CharacterButton
-                        .TransformToVisual(LayoutCanvas)
-                        .TransformPoint(new Point(CharacterButton.ActualWidth / 2, CharacterButton.ActualHeight / 2));
+                // Get character position from Canvas (DIPs) - more reliable than TransformToVisual
+                var characterLeft = Canvas.GetLeft(CharacterButton);
+                var characterTop = Canvas.GetTop(CharacterButton);
 
-                    return new PointInt32(
-                        AppWindow.Position.X + Convert.ToInt32(relative.X * scale),
-                        AppWindow.Position.Y + Convert.ToInt32(relative.Y * scale));
-                }
-                catch
-                {
-                    // Fall through to the default anchor if layout is not ready yet.
-                }
+                // Handle NaN (default unset values)
+                if (double.IsNaN(characterLeft))
+                    characterLeft = CharacterPadding;
+                if (double.IsNaN(characterTop))
+                    characterTop = CharacterPadding;
+
+                // Calculate center point of the character
+                var characterCenterX = characterLeft + (CharacterSize / 2);
+                var characterCenterY = characterTop + (CharacterSize / 2);
+
+                // Convert to screen pixels: window position + (DIPs * scale)
+                return new PointInt32(
+                    AppWindow.Position.X + Convert.ToInt32(characterCenterX * scale),
+                    AppWindow.Position.Y + Convert.ToInt32(characterCenterY * scale));
             }
 
             var workArea = GetCurrentWorkArea();
