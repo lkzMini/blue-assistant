@@ -1,7 +1,7 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using Windows.System;
 
-namespace Clippy.Windows
+namespace Blue.Windows
 {
     public static class WindowsSystemDispatcherQueueHelper
     {

@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.2.32616.157
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Clippy", "Clippy\Clippy.csproj", "{7F32CA32-9073-4B3B-974F-90967083B604}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Blue", "Blue\Blue.csproj", "{7F32CA32-9073-4B3B-974F-90967083B604}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CubeKit.UI", "CubeKit.UI\CubeKit.UI.csproj", "{AF04C3A3-C6EA-4079-9C32-52E3B64E62FE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Clippy.Core", "Clippy.Core\Clippy.Core.csproj", "{9BEE1DE6-3450-4BA9-AE52-A97778418B99}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blue.Core", "Blue.Core\Blue.Core.csproj", "{9BEE1DE6-3450-4BA9-AE52-A97778418B99}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

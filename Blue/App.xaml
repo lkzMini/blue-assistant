@@ -1,8 +1,8 @@
-﻿<Application
-    x:Class="Clippy.App"
+<Application
+    x:Class="Blue.App"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:Clippy" 
+    xmlns:local="using:Blue" 
     xmlns:ToolkitControls="using:CommunityToolkit.WinUI.UI.Controls" 
     xmlns:icons="using:CubeKit.UI.Icons">
     <Application.Resources>

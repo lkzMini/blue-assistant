@@ -1,10 +1,10 @@
-﻿using Clippy.Core.Enums;
-using Clippy.Core.Interfaces;
+using Blue.Core.Enums;
+using Blue.Core.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Clippy.Core.Classes
+namespace Blue.Core.Classes
 {
 	public record Message(Role Role, string MessageText, DateTime MessageDate) : IMessage
 	{

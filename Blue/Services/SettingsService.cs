@@ -1,5 +1,5 @@
-﻿using Clippy.Core.Services;
-using Clippy.Helpers;
+using Blue.Core.Services;
+using Blue.Helpers;
 using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 using System.Collections.Generic;
@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Windows.Storage;
 
-namespace Clippy.Services
+namespace Blue.Services
 {
     public class SettingsService : ObservableObject, ISettingsService
     {
@@ -25,14 +25,14 @@ namespace Clippy.Services
             }
         }
 
-        private bool trayClippy = (bool)(Settings.Values["TrayClippy"] ?? true);
-        public bool TrayClippy
+        private bool enableTray = (bool)(Settings.Values["enableTray"] ?? true);
+        public bool enableTray
         {
-            get => trayClippy;
+            get => enableTray;
             set
             {
-                Settings.Values["TrayClippy"] = value;
-                SetProperty(ref trayClippy, value);
+                Settings.Values["enableTray"] = value;
+                SetProperty(ref enableTray, value);
                 //if (value)
                    // ClippyTrayListener.Recreate();
                // else

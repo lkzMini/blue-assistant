@@ -1,8 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Clippy.Core.Enums
+namespace Blue.Core.Enums
 {
 	public enum Role
 	{

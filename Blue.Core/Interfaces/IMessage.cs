@@ -1,10 +1,10 @@
-﻿using Clippy.Core.Enums;
+using Blue.Core.Enums;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Text;
 
-namespace Clippy.Core.Interfaces
+namespace Blue.Core.Interfaces
 {
 	public interface IMessage
 	{

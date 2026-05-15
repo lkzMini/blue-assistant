@@ -1,4 +1,4 @@
-﻿using CubeKit.UI.Helpers;
+using CubeKit.UI.Helpers;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -17,16 +17,16 @@ using Windows.Foundation.Collections;
 using WinUIEx;
 using Windows.Win32;
 using WinRT.Interop;
-using Clippy.Windows;
+using Blue.Windows;
 using WinUIEx.Messaging;
 using Windows.Win32.UI.WindowsAndMessaging;
 using Microsoft.UI;
 using Microsoft.UI.Input;
-using Clippy.Core.ViewModels;
+using Blue.Core.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
-using Clippy.Services;
-using Clippy.Helpers;
-using Clippy.Core.Services;
+using Blue.Services;
+using Blue.Helpers;
+using Blue.Core.Services;
 using Windows.UI.Input.Preview.Injection;
 using Windows.UI.Input;
 using Windows.Devices.Input;
@@ -44,7 +44,7 @@ using System.Reflection.Metadata;
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
 
-namespace Clippy
+namespace Blue
 {
     /// <summary>
     /// An empty window that can be used on its own or navigated to within a Frame.
@@ -52,7 +52,7 @@ namespace Clippy
     public sealed partial class MainWindow : WindowEx
     {
         private SettingsService Settings = (SettingsService)App.Current.Services.GetService<ISettingsService>();
-        private ClippyViewModel Clippy = App.Current.Services.GetService<ClippyViewModel>();
+        private ClippyViewModel Blue = App.Current.Services.GetService<ClippyViewModel>();
         WindowMessageMonitor m;
         private bool isMovePointerPressed;
         private bool isMovingWindow;
@@ -137,19 +137,19 @@ namespace Clippy
             LayoutCanvas.Background = new SolidColorBrush(Colors.Transparent);
             SetCharacterTooltipEnabled(true);
 
-            ClippyKeyboardListener.Setup(this);
+            KeyboardListener.Setup(this);
 
-            Clippy.IsClippyEnabled = false;
+            Blue.isExpanded = false;
             Collapse();
 
             this.BringToFront();
-			if (Clippy.IsPinned) Pin();
+			if (Blue.IsPinned) Pin();
 			else Unpin();
-			Clippy.PropertyChanged += (object sender, System.ComponentModel.PropertyChangedEventArgs e) =>
+			Blue.PropertyChanged += (object sender, System.ComponentModel.PropertyChangedEventArgs e) =>
             {
                 if(e.PropertyName == "IsPinned")
                 {
-                    if (Clippy.IsPinned) Pin();
+                    if (Blue.IsPinned) Pin();
                     else Unpin();
                 }
 			};
@@ -510,8 +510,8 @@ namespace Clippy
                 return;
             }
 
-            Clippy.IsClippyEnabled = !Clippy.IsClippyEnabled;
-            if (Clippy.IsClippyEnabled)
+            Blue.isExpanded = !Blue.isExpanded;
+            if (Blue.isExpanded)
                 Expand();
             else
                 Collapse();
@@ -595,10 +595,10 @@ namespace Clippy
             e.Handled = true;
 
             if (sender is TextBox textBox)
-                Clippy.CurrentText = textBox.Text;
+                Blue.CurrentText = textBox.Text;
 
-            if (!Clippy.SendPromptCommand.IsRunning && Clippy.SendPromptCommand.CanExecute(null))
-                Clippy.SendPromptCommand.Execute(null);
+            if (!Blue.SendPromptCommand.IsRunning && Blue.SendPromptCommand.CanExecute(null))
+                Blue.SendPromptCommand.Execute(null);
 		}
 
 		private void TextBox_KeyUp(object sender, KeyRoutedEventArgs e)
@@ -609,7 +609,7 @@ namespace Clippy
 
 		private void Hide_Click(object sender, RoutedEventArgs e)
 		{
-            Clippy.IsClippyEnabled = false;
+            Blue.isExpanded = false;
             Collapse();
             Activate();
 		}

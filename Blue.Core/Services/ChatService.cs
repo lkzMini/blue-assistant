@@ -1,5 +1,5 @@
-using Clippy.Core.Classes;
-using Clippy.Core.Interfaces;
+using Blue.Core.Classes;
+using Blue.Core.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +9,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Clippy.Core.Services
+namespace Blue.Core.Services
 {
     public class ChatService : IChatService
     {

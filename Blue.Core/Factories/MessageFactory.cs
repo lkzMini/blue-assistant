@@ -1,11 +1,11 @@
-﻿using Clippy.Core.Interfaces;
-using Clippy.Core.ViewModels.Messages;
-using Clippy.Core.ViewModels;
+using Blue.Core.Interfaces;
+using Blue.Core.ViewModels.Messages;
+using Blue.Core.ViewModels;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Clippy.Core.Factories
+namespace Blue.Core.Factories
 {
 	public class MessageFactory
 	{
@@ -16,7 +16,7 @@ namespace Clippy.Core.Factories
 				case Enums.Role.User:
 					return new UserMessageViewModel(message);
 				case Enums.Role.Assistant:
-					return new ClippyMessageViewModel(message);
+					return new AssistantMessageViewModel(message);
 				default:
 					return new SystemMessageViewModel(message);
 			}

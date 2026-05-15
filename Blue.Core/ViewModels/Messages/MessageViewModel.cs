@@ -1,11 +1,11 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
-using Clippy.Core.Interfaces;
+using CommunityToolkit.Mvvm.ComponentModel;
+using Blue.Core.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Clippy.Core.ViewModels
+namespace Blue.Core.ViewModels
 {
 	public abstract partial class MessageViewModel : ObservableObject
 	{

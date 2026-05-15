@@ -1,9 +1,9 @@
-﻿using Clippy.Core.Interfaces;
+using Blue.Core.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Clippy.Core.ViewModels.Messages
+namespace Blue.Core.ViewModels.Messages
 {
 	public class SystemMessageViewModel : MessageViewModel
 	{

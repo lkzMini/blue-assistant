@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Composition.SystemBackdrops;
+using Microsoft.UI.Composition.SystemBackdrops;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,7 +8,7 @@ using System.Windows;
 using WinRT;
 using WinUIEx;
 
-namespace Clippy.Windows
+namespace Blue.Windows
 {
     public class MicaWindow
     {

@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using Microsoft.UI.Xaml.Media;
 using Compositor = Windows.UI.Composition.Compositor;
 using Windows.UI.Composition;
 using ICompositionSupportsSystemBackdrop = Microsoft.UI.Composition.ICompositionSupportsSystemBackdrop;
 using Windows.UI;
 
-namespace Clippy.Windows
+namespace Blue.Windows
 {
     internal partial class TransparentBackdrop : SystemBackdrop
     {

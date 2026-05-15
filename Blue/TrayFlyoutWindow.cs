@@ -1,6 +1,6 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 
-namespace Clippy.Tray
+namespace Blue.Tray
 {
     internal sealed class TrayFlyoutWindow : Window
     {

@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -16,19 +16,19 @@ using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
-using Clippy.Core.ViewModels;
-using Clippy.Core.Services;
-using Clippy.Services;
+using Blue.Core.ViewModels;
+using Blue.Core.Services;
+using Blue.Services;
 using System.Threading.Tasks;
 using System.Runtime.ExceptionServices;
 using WinUIEx;
-using Clippy.Tray;
+using Blue.Tray;
 using System.Threading;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
 
-namespace Clippy
+namespace Blue
 {
     /// <summary>
     /// Provides application-specific behavior to supplement the default Application class.
@@ -92,13 +92,13 @@ namespace Clippy
         {
 			if (AppInstance.GetActivatedEventArgs().Kind != ActivationKind.StartupTask)
 			{
-               ShowClippy();
+               ShowBlue();
 			}
 
             TrayWindow = new TrayFlyoutWindow();
         }
 
-        public void ShowClippy()
+        public void ShowBlue()
         {
 			if (m_window is null)
 				m_window = new MainWindow();

@@ -1,4 +1,4 @@
-﻿using Clippy.Core.Services;
+using Blue.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using System.Xml.Linq;
 using Windows.Security.Credentials;
 
-namespace Clippy.Services
+namespace Blue.Services
 {
     public class KeyService : IKeyService
     {

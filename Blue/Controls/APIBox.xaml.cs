@@ -1,5 +1,5 @@
-﻿using Clippy.Core.Services;
-using Clippy.Services;
+using Blue.Core.Services;
+using Blue.Services;
 using CubeKit.UI.Icons;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
@@ -21,7 +21,7 @@ using Windows.System;
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
 
-namespace Clippy.Controls
+namespace Blue.Controls
 {
     public sealed partial class APIBox : UserControl
     {
