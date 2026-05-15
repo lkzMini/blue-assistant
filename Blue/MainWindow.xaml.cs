@@ -15,11 +15,9 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using WinUIEx;
-using Windows.Win32;
 using WinRT.Interop;
 using Blue.Windows;
 using WinUIEx.Messaging;
-using Windows.Win32.UI.WindowsAndMessaging;
 using Microsoft.UI;
 using Microsoft.UI.Input;
 using Blue.Core.ViewModels;
@@ -59,6 +57,7 @@ namespace Blue
         private bool suppressNextCharacterTap;
         private NativeHelper.Point moveStartCursor;
         private NativeHelper.RECT moveStartWindowRect;
+        private const uint WM_ERASEBKGND = 0x0014;
         private const int MoveDragThreshold = 4;
         private const double CharacterSize = 100;
         private const double CharacterPadding = 24;
@@ -201,7 +200,7 @@ namespace Blue
 
         private void WindowMessageReceived(object? sender, WindowMessageEventArgs e)
         {
-            if (e.Message.MessageId == PInvoke.WM_ERASEBKGND)
+            if (e.Message.MessageId == WM_ERASEBKGND)
             {
                 e.Handled = true;
                 e.Result = 1;

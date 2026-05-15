@@ -80,7 +80,6 @@ namespace Blue
                 ShowBlue();
             }
 
-            TrayWindow = new TrayFlyoutWindow();
         }
 
         public void ShowBlue()
@@ -191,7 +190,6 @@ namespace Blue
         private MainWindow m_window;
         private readonly TrayService _trayService = new();
         private Window s_window;
-        private TrayFlyoutWindow TrayWindow = null!;
 
         private static void OnUnobservedException(object? sender, UnobservedTaskExceptionEventArgs e) => e.SetObserved();
 
