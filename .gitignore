@@ -369,3 +369,6 @@ FodyWeavers.xsd
 
 # Engram persistent memory
 .engram/
+
+# Distribution package
+/dist/
