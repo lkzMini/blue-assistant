@@ -8,12 +8,14 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 
 namespace Blue.Core.Services
 {
-    public class ChatService : IChatService
+    public class ChatService : IChatService, IDisposable
     {
         private readonly HttpClient _httpClient;
+        private readonly HttpClient _healthClient;
         private readonly string _ollamaEndpoint = "http://localhost:11434";
         private readonly string _model = "phi3:latest";
 
@@ -21,7 +23,12 @@ namespace Blue.Core.Services
         {
             _httpClient = new HttpClient
             {
-                Timeout = TimeSpan.FromSeconds(5)
+                Timeout = TimeSpan.FromSeconds(30)
+            };
+
+            _healthClient = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(3)
             };
         }
 
@@ -29,7 +36,10 @@ namespace Blue.Core.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{_ollamaEndpoint}/api/tags");
+                // Use a dedicated client with a short timeout so health checks
+                // never interfere with or are blocked by in-flight chat requests.
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                var response = await _healthClient.GetAsync($"{_ollamaEndpoint}/api/tags", cts.Token);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -116,6 +126,12 @@ namespace Blue.Core.Services
                     yield return chunk.message.content;
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            _httpClient.Dispose();
+            _healthClient.Dispose();
         }
     }
 

@@ -129,7 +129,7 @@ namespace Blue
         {
             if (m_window is null) return;
 
-            m_window.DispatcherQueue.TryEnqueue(async () =>
+            m_window.DispatcherQueue.TryEnqueue(() =>
             {
                 var viewModel = Services.GetService<AssistantViewModel>();
                 if (viewModel is null) return;
@@ -168,7 +168,7 @@ namespace Blue
                         m_window.Show();
                         m_window.Activate();
                         m_window.BringToFront();
-                        await viewModel.CheckOllamaOnStartup();
+                        _ = CheckOllamaAsync(m_window.DispatcherQueue, viewModel);
                         break;
 
                     case TrayMenuAction.Exit:
@@ -176,6 +176,54 @@ namespace Blue
                         break;
                 }
             });
+        }
+
+        internal static void Log(string msg)
+        {
+            try
+            {
+                var logDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Blue");
+                var logPath = System.IO.Path.Combine(logDir, "crash.log");
+                System.IO.Directory.CreateDirectory(logDir);
+                System.IO.File.AppendAllText(logPath, $"{DateTime.Now:HH:mm:ss.fff} [{Environment.CurrentManagedThreadId}] {msg}{Environment.NewLine}");
+            }
+            catch { }
+        }
+
+        private async Task CheckOllamaAsync(Microsoft.UI.Dispatching.DispatcherQueue dispatcher, AssistantViewModel viewModel)
+        {
+            try
+            {
+                var chatService = Services.GetService<IChatService>();
+                if (chatService is null) return;
+
+                var isRunning = await Task.Run(() => chatService.HealthCheckAsync());
+
+                dispatcher.TryEnqueue(() =>
+                {
+                    try
+                    {
+                        // Expand the chat so the user can see the result
+                        m_window.Expand();
+                        viewModel.ShowOllamaResult(isRunning);
+                    }
+                    catch (Exception innerEx)
+                    {
+                        Log($"CheckOllama-UI: {innerEx.GetType().Name}: {innerEx.Message}");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Log($"CheckOllama: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        private static void LogException(Exception ex, string prefix)
+        {
+            Log($"{prefix}: {ex.GetType().Name}: {ex.Message}");
+            if (ex.StackTrace is not null)
+                Log($"{prefix} STACK: {ex.StackTrace}");
         }
 
         public void OpenSettings()
@@ -190,8 +238,27 @@ namespace Blue
         private readonly TrayService _trayService = new();
         private Window s_window;
 
-        private static void OnUnobservedException(object? sender, UnobservedTaskExceptionEventArgs e) => e.SetObserved();
+        private static void OnUnobservedException(object? sender, UnobservedTaskExceptionEventArgs e)
+        {
+            if (e.Exception is not null)
+                Log($"UnobservedTaskException: {e.Exception.GetType().Name}: {e.Exception.Message}");
+            e.SetObserved();
+        }
 
-        private static void OnUnhandledException(object? sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e) => e.Handled = true;
+        private static void OnUnhandledException(object? sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+        {
+            var ex = e.Exception;
+            Log($"UnhandledException: {ex?.GetType().Name}: {ex?.Message}");
+            if (ex?.InnerException != null)
+            {
+                Log($"InnerException: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+                Log($"InnerStackTrace: {ex.InnerException.StackTrace}");
+            }
+            else if (ex != null)
+            {
+                Log($"StackTrace: {ex.StackTrace}");
+            }
+            e.Handled = true;
+        }
     }
 }

@@ -55,31 +55,63 @@ namespace Blue.Core.ViewModels
             ChatService = chatService;
             SettingsService = settingsService;
             isPinned = SettingsService.AutoPin;
-			_ = InitializeAsync();
+			Initialize();
         }
 
-		private async Task InitializeAsync()
+		private void Initialize()
 		{
 			SetupChat();
-			await CheckOllamaOnStartup();
 		}
 
+		/// <summary>
+		/// Checks if Ollama is reachable. Must be called from UI thread.
+		/// After the await, the continuation may run on a thread-pool thread,
+		/// so this should only be used from fire-and-forget startup contexts
+		/// where a silent failure to show the warning is acceptable.
+		/// </summary>
 		public async Task<bool> CheckOllamaOnStartup()
 		{
 			var ollamaRunning = await ChatService.HealthCheckAsync();
 			if (!ollamaRunning)
+				ShowOllamaResult(false);
+			return ollamaRunning;
+		}
+
+		/// <summary>
+		/// Adds an Ollama status message. Must be called from the UI thread.
+		/// </summary>
+		public void ShowOllamaResult(bool isRunning)
+		{
+			if (isRunning)
 			{
 				AddMessage(new Message(Role.System,
-					"⚠️ Ollama is not running or not reachable. "
-					+ "Make sure Ollama is installed and running, then try:\n"
+					"✅ Ollama is running and reachable at localhost:11434."));
+			}
+			else
+			{
+				AddMessage(new Message(Role.System,
+					"⚠️ Ollama is not running or not reachable.\n"
+					+ "Make sure Ollama is installed and running. "
+					+ "Look for Ollama in your system tray or taskbar.\n\n"
+					+ "If it's not running, open a terminal and run:\n"
+					+ "  ollama serve\n\n"
+					+ "Then make sure the model is installed:\n"
 					+ "  ollama pull phi3:latest"));
 			}
-			return ollamaRunning;
+		}
+
+		/// <summary>
+		/// Pure network check — no UI work. Safe to call from any thread.
+		/// </summary>
+		public async Task<bool> IsOllamaRunningAsync()
+		{
+			return await ChatService.HealthCheckAsync();
 		}
 
 		private void SetupChat()
 		{
-			AddMessage(new Message(Role.System, Constants.DEFAULT_SYSTEM_PROMPT));
+			// System prompt is internal AI context — not shown in the visible chat
+			Messages.Add(new Message(Role.System, Constants.DEFAULT_SYSTEM_PROMPT));
 			AddMessage(new Message(Role.Assistant, Constants.FIRST_ASSISTANT_MESSAGE));
 		}
 

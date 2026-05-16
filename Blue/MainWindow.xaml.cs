@@ -1,623 +1,486 @@
+using Blue.Core.ViewModels;
+using Blue.Core.Services;
+using Blue.Helpers;
+using Blue.Services;
+using Blue.Windows;
 using CubeKit.UI.Helpers;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI;
+using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Navigation;
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
+using System.ComponentModel;
+using TerraFX.Interop.Windows;
 using Windows.Foundation;
-using Windows.Foundation.Collections;
-using WinUIEx;
-using WinRT.Interop;
-using Blue.Windows;
-using WinUIEx.Messaging;
-using Microsoft.UI;
-using Microsoft.UI.Input;
-using Blue.Core.ViewModels;
-using Microsoft.Extensions.DependencyInjection;
-using Blue.Services;
-using Blue.Helpers;
-using Blue.Core.Services;
-using Windows.UI.Input.Preview.Injection;
-using Windows.UI.Input;
-using Windows.Devices.Input;
+using Windows.Graphics;
 using Windows.System;
 using Windows.UI.Core;
-using System.Diagnostics.Eventing.Reader;
-using TerraFX.Interop.Windows;
-using Windows.Graphics;
-using static TerraFX.Interop.Windows.WS;
-using static TerraFX.Interop.Windows.Windows;
-using static TerraFX.Interop.Windows.GWL;
+using WinRT.Interop;
+using WinUIEx;
+using WinUIEx.Messaging;
 using static TerraFX.Interop.Windows.SWP;
 using static TerraFX.Interop.Windows.SW;
-using System.Reflection.Metadata;
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
+using static TerraFX.Interop.Windows.Windows;
+using static TerraFX.Interop.Windows.GWL;
+using static TerraFX.Interop.Windows.WS;
 
-namespace Blue
+namespace Blue;
+
+public sealed partial class MainWindow : WindowEx
 {
-    /// <summary>
-    /// An empty window that can be used on its own or navigated to within a Frame.
-    /// </summary>
-    public sealed partial class MainWindow : WindowEx
+    private SettingsService Settings = (SettingsService)App.Current.Services.GetService<ISettingsService>();
+    private AssistantViewModel Assistant = App.Current.Services.GetService<AssistantViewModel>();
+    WindowMessageMonitor m;
+    private bool isMovePointerPressed;
+    private bool isMovingWindow;
+    private bool suppressNextCharacterTap;
+    private NativeHelper.Point moveStartCursor;
+    private NativeHelper.RECT moveStartWindowRect;
+    private const uint WM_ERASEBKGND = 0x0014;
+    private const int MoveDragThreshold = 4;
+    private const double CharacterSize = 100;
+    private const double CharacterPadding = 24;
+    private const double CollapsedWindowSize = CharacterSize + (CharacterPadding * 2);
+    private const double ChatWidth = 360;
+    private const double PreferredChatHeight = 720;
+    private const double MinChatHeight = 320;
+    private const double CompanionGap = 8;
+    private const double MonitorMargin = 12;
+    private const string CharacterTooltipText = "Click to expand or collapse. Drag Blue to move him.";
+
+    // Separate chat window — Blue window NEVER resizes or repositions on expand/collapse
+    private ChatWindow _chatWindow;
+    private bool _chatWindowCreated;
+    private bool _chatWindowPositioned;
+    private int _chatDragOffsetX;
+    private int _chatDragOffsetY;
+
+    public MainWindow()
     {
-        private SettingsService Settings = (SettingsService)App.Current.Services.GetService<ISettingsService>();
-        private AssistantViewModel Assistant = App.Current.Services.GetService<AssistantViewModel>();
-        WindowMessageMonitor m;
-        private bool isMovePointerPressed;
-        private bool isMovingWindow;
-        private bool suppressNextCharacterTap;
-        private NativeHelper.Point moveStartCursor;
-        private NativeHelper.RECT moveStartWindowRect;
-        private const uint WM_ERASEBKGND = 0x0014;
-        private const int MoveDragThreshold = 4;
-        private const double CharacterSize = 100;
-        private const double CharacterPadding = 24;
-        private const double CollapsedWindowSize = CharacterSize + (CharacterPadding * 2);
-        private const double ChatWidth = 360;
-        private const double PreferredChatHeight = 720;
-        private const double MinChatHeight = 320;
-        private const double CompanionGap = 8;
-        private const double MonitorMargin = 12;
-        private const string CharacterTooltipText = "Click to expand or collapse. Drag Blue to move him.";
-
-        private enum CompanionPlacement
+        this.InitializeComponent();
+        ConfigureFloatingWindowChrome();
+        m = new(this);
+        unsafe
         {
-            Left,
-            Right,
-            Up,
-            Down
-        }
-
-        private readonly struct CompanionLayout
-        {
-            public CompanionLayout(
-                CompanionPlacement placement,
-                double windowWidth,
-                double windowHeight,
-                double windowLeft,
-                double windowTop,
-                double characterLeft,
-                double characterTop,
-                double chatLeft,
-                double chatTop,
-                double chatHeight,
-                double overflow)
-            {
-                Placement = placement;
-                WindowWidth = windowWidth;
-                WindowHeight = windowHeight;
-                WindowLeft = windowLeft;
-                WindowTop = windowTop;
-                CharacterLeft = characterLeft;
-                CharacterTop = characterTop;
-                ChatLeft = chatLeft;
-                ChatTop = chatTop;
-                ChatHeight = chatHeight;
-                Overflow = overflow;
-            }
-
-            public CompanionPlacement Placement { get; }
-            public double WindowWidth { get; }
-            public double WindowHeight { get; }
-            public double WindowLeft { get; }
-            public double WindowTop { get; }
-            public double CharacterLeft { get; }
-            public double CharacterTop { get; }
-            public double ChatLeft { get; }
-            public double ChatTop { get; }
-            public double ChatHeight { get; }
-            public double Overflow { get; }
-        }
-
-        public MainWindow()
-        {
-            this.InitializeComponent();
-            ConfigureFloatingWindowChrome();
-            m = new(this);
-            unsafe
-            {
-                var hwnd = (HWND)this.GetWindowHandle();
-                int lExStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
-                SetWindowLong(hwnd, GWL_EXSTYLE, lExStyle | WS_EX_LAYERED);
-            }
-            m.WindowMessageReceived += WindowMessageReceived;
-
-            SystemBackdrop = new TransparentBackdrop();
-            LayoutCanvas.Background = new SolidColorBrush(Colors.Transparent);
-            SetCharacterTooltipEnabled(true);
-
-            KeyboardListener.Setup(this);
-
-            Assistant.IsExpanded = false;
-            Collapse();
-
-            this.BringToFront();
-            if (Assistant.IsPinned) Pin();
-            else Unpin();
-            // Sync initial pin state to TrayService
-            App.Current.TrayService.IsPinned = Assistant.IsPinned;
-
-            Assistant.PropertyChanged += (object sender, System.ComponentModel.PropertyChangedEventArgs e) =>
-            {
-                if (e.PropertyName == "IsPinned")
-                {
-                    if (Assistant.IsPinned) Pin();
-                    else Unpin();
-                    // Sync pin state to TrayService for tray menu context
-                    App.Current.TrayService.IsPinned = Assistant.IsPinned;
-                }
-            };
-        }
-
-        private void ConfigureFloatingWindowChrome()
-        {
-            ExtendsContentIntoTitleBar = true;
-
-            if (AppWindow.Presenter is OverlappedPresenter presenter)
-            {
-                presenter.SetBorderAndTitleBar(false, false);
-                presenter.IsResizable = false;
-                presenter.IsMinimizable = false;
-                presenter.IsMaximizable = false;
-            }
-        }
-
-		private unsafe void Pin()
-        {
-			var presenter = this.AppWindow.Presenter as OverlappedPresenter;
             var hwnd = (HWND)this.GetWindowHandle();
-			if (presenter is not null) presenter.IsAlwaysOnTop = true;
+            int lExStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+            SetWindowLong(hwnd, GWL_EXSTYLE, lExStyle | WS_EX_LAYERED);
+        }
+        m.WindowMessageReceived += WindowMessageReceived;
 
-			// Add the extended window styles for always on top
-			int lExStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
-			SetWindowLong(hwnd, GWL_EXSTYLE, lExStyle | WS_EX_TOPMOST);
+        SystemBackdrop = new TransparentBackdrop();
+        LayoutCanvas.Background = new SolidColorBrush(Colors.Transparent);
+        SetCharacterTooltipEnabled(true);
 
-			// Move window to top
-			SetWindowPos(hwnd, HWND.HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-		}
+        KeyboardListener.Setup(this);
 
-        private unsafe void Unpin()
+        Assistant.IsExpanded = false;
+
+        // Blue window size is FIXED for its entire lifetime — never changes
+        LayoutCanvas.Width = CollapsedWindowSize;
+        LayoutCanvas.Height = CollapsedWindowSize;
+        LayoutCanvas.MaxHeight = CollapsedWindowSize;
+        Canvas.SetLeft(CharacterButton, CharacterPadding);
+        Canvas.SetTop(CharacterButton, CharacterPadding);
+        Width = CollapsedWindowSize;
+        Height = CollapsedWindowSize;
+
+        // First launch: anchor to bottom-right of primary monitor
+        var scale = GetScale();
+        var primaryArea = DisplayArea.Primary.WorkArea;
+        var halfChar = Convert.ToInt32((CharacterSize / 2) * scale);
+        var anchorX = primaryArea.X + primaryArea.Width - halfChar - Convert.ToInt32(80 * scale);
+        var anchorY = primaryArea.Y + primaryArea.Height - halfChar - Convert.ToInt32(40 * scale);
+        var initLeft = anchorX - Convert.ToInt32(CollapsedWindowSize / 2 * scale);
+        var initTop = anchorY - Convert.ToInt32(CollapsedWindowSize / 2 * scale);
+        AppWindow.Move(new PointInt32(initLeft, initTop));
+        AppWindow.Resize(new SizeInt32(Convert.ToInt32(CollapsedWindowSize * scale), Convert.ToInt32(CollapsedWindowSize * scale)));
+
+        this.BringToFront();
+        if (Assistant.IsPinned) Pin();
+        else Unpin();
+        App.Current.TrayService.IsPinned = Assistant.IsPinned;
+
+        Assistant.PropertyChanged += (object sender, PropertyChangedEventArgs e) =>
         {
-			var presenter = this.AppWindow.Presenter as OverlappedPresenter;
-			var hwnd = (HWND)this.GetWindowHandle();
-			if (presenter is not null) presenter.IsAlwaysOnTop = false;
+            if (e.PropertyName == "IsPinned")
+            {
+                if (Assistant.IsPinned) Pin();
+                else Unpin();
+                App.Current.TrayService.IsPinned = Assistant.IsPinned;
+            }
+        };
+    }
 
-			// Add the extended window styles for always on top
-			int lExStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
-			SetWindowLong(hwnd, GWL_EXSTYLE, lExStyle & ~WS_EX_TOPMOST);
+    private void ConfigureFloatingWindowChrome()
+    {
+        ExtendsContentIntoTitleBar = true;
+        if (AppWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.SetBorderAndTitleBar(false, false);
+            presenter.IsResizable = false;
+            presenter.IsMinimizable = false;
+            presenter.IsMaximizable = false;
+        }
+    }
 
-			this.BringToFront();
-		}
+    private unsafe void Pin()
+    {
+        var presenter = this.AppWindow.Presenter as OverlappedPresenter;
+        var hwnd = (HWND)this.GetWindowHandle();
+        if (presenter is not null) presenter.IsAlwaysOnTop = true;
 
-        private void WindowMessageReceived(object? sender, WindowMessageEventArgs e)
+        int lExStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        SetWindowLong(hwnd, GWL_EXSTYLE, lExStyle | WS_EX_TOPMOST);
+        SetWindowPos(hwnd, HWND.HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+
+        // Sync ChatWindow to same pin state
+        PinChatWindow();
+    }
+
+    private unsafe void Unpin()
+    {
+        var presenter = this.AppWindow.Presenter as OverlappedPresenter;
+        var hwnd = (HWND)this.GetWindowHandle();
+        if (presenter is not null) presenter.IsAlwaysOnTop = false;
+
+        int lExStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        SetWindowLong(hwnd, GWL_EXSTYLE, lExStyle & ~WS_EX_TOPMOST);
+
+        this.BringToFront();
+
+        // Sync ChatWindow to same pin state
+        UnpinChatWindow();
+    }
+
+    private unsafe void PinChatWindow()
+    {
+        if (!_chatWindowCreated) return;
+        var hwnd = (HWND)_chatWindow.GetWindowHandle();
+        int lExStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        SetWindowLong(hwnd, GWL_EXSTYLE, lExStyle | WS_EX_TOPMOST);
+        SetWindowPos(hwnd, HWND.HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+
+    private unsafe void UnpinChatWindow()
+    {
+        if (!_chatWindowCreated) return;
+        var hwnd = (HWND)_chatWindow.GetWindowHandle();
+        int lExStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        SetWindowLong(hwnd, GWL_EXSTYLE, lExStyle & ~WS_EX_TOPMOST);
+    }
+
+    private void WindowMessageReceived(object? sender, WindowMessageEventArgs e)
+    {
+        try
         {
             if (e.Message.MessageId == WM_ERASEBKGND)
             {
                 e.Handled = true;
                 e.Result = 1;
             }
-
-            // Forward tray icon callback messages
             App.Current.TrayService.HandleWindowMessage(
                 e.Message.MessageId,
                 e.Message.WParam,
                 e.Message.LParam);
         }
-
-        private double GetScale()
+        catch (Exception ex)
         {
-            var hwnd = this.GetWindowHandle();
-            var monitor = NativeHelper.MonitorFromWindow(hwnd, NativeHelper.MONITOR_DEFAULTTONEAREST);
-
-            NativeHelper.DeviceScaleFactor scale;
-            NativeHelper.GetScaleFactorForMonitor(monitor, out scale);
-
-            if (scale == NativeHelper.DeviceScaleFactor.DEVICE_SCALE_FACTOR_INVALID)
-                scale = NativeHelper.DeviceScaleFactor.SCALE_100_PERCENT;
-
-            return Convert.ToDouble(scale) / 100;
+            App.Log($"WindowMessageReceived CRASH: {ex.GetType().Name}: {ex.Message}");
         }
+    }
 
-        private void Settings_Click(object sender, RoutedEventArgs e)
+    private double GetScale()
+    {
+        var hwnd = this.GetWindowHandle();
+        var monitor = NativeHelper.MonitorFromWindow(hwnd, NativeHelper.MONITOR_DEFAULTTONEAREST);
+        NativeHelper.DeviceScaleFactor scale;
+        NativeHelper.GetScaleFactorForMonitor(monitor, out scale);
+        if (scale == NativeHelper.DeviceScaleFactor.DEVICE_SCALE_FACTOR_INVALID)
+            scale = NativeHelper.DeviceScaleFactor.SCALE_100_PERCENT;
+        return Convert.ToDouble(scale) / 100;
+    }
+
+    /// <summary>
+    /// Show the chat window adjacent to Blue. Blue's own window NEVER moves or resizes.
+    /// </summary>
+    internal void Expand()
+    {
+        if (!_chatWindowCreated)
         {
-            App.Current.OpenSettings();
-        }
-
-        private Visibility BtoV(bool b) => b ? Visibility.Visible : Visibility.Collapsed;
-
-        private void Collapse()
-        {
-            ApplyCompanionLayout(false, GetCharacterAnchorScreenPoint());
-        }
-
-        private void Expand()
-        {
-            ApplyCompanionLayout(true, GetCharacterAnchorScreenPoint());
-        }
-
-        private void ApplyCompanionLayout(bool isExpanded, PointInt32 requestedAnchor)
-        {
-            var scale = GetScale();
-            var workArea = GetCurrentWorkArea();
-            var anchor = ClampCharacterAnchor(requestedAnchor, workArea, scale);
-
-            if (!isExpanded)
+            _chatWindow = new ChatWindow { Owner = this };
+            _chatWindow.Closed += (s, e) =>
             {
-                ChatPanel.Visibility = Visibility.Collapsed;
-                ApplyLayout(
-                    windowWidth: CollapsedWindowSize,
-                    windowHeight: CollapsedWindowSize,
-                    windowLeft: anchor.X - (CollapsedWindowSize / 2 * scale),
-                    windowTop: anchor.Y - (CollapsedWindowSize / 2 * scale),
-                    characterLeft: CharacterPadding,
-                    characterTop: CharacterPadding,
-                    chatLeft: 0,
-                    chatTop: 0,
-                    chatHeight: 0,
-                    workArea: workArea,
-                    scale: scale);
-                return;
-            }
+                // If ChatWindow was closed directly (Alt+F4), reset for re-creation
+                _chatWindow = null;
+                _chatWindowCreated = false;
+                _chatWindowPositioned = false;
+                if (Assistant.IsExpanded)
+        Assistant.IsExpanded = false;
 
-            var layout = ChooseExpandedLayout(anchor, workArea, scale);
-            ChatPanel.Visibility = Visibility.Visible;
-            ApplyLayout(
-                layout.WindowWidth,
-                layout.WindowHeight,
-                layout.WindowLeft,
-                layout.WindowTop,
-                layout.CharacterLeft,
-                layout.CharacterTop,
-                layout.ChatLeft,
-                layout.ChatTop,
-                layout.ChatHeight,
-                workArea,
-                scale);
-        }
-
-        private CompanionLayout ChooseExpandedLayout(PointInt32 anchor, RectInt32 workArea, double scale)
-        {
-            var reservedCharacterHeight = CharacterSize + (CharacterPadding * 2);
-            var availableHeight = Math.Max(MinChatHeight, (workArea.Height / scale) - (MonitorMargin * 2));
-            var horizontalChatHeight = Math.Min(PreferredChatHeight, availableHeight);
-            var verticalChatHeight = Math.Min(PreferredChatHeight, Math.Max(MinChatHeight, (workArea.Height / scale) - reservedCharacterHeight - CompanionGap - (MonitorMargin * 2)));
-
-            var candidates = new[]
-            {
-                BuildExpandedLayout(CompanionPlacement.Left, anchor, workArea, scale, horizontalChatHeight),
-                BuildExpandedLayout(CompanionPlacement.Right, anchor, workArea, scale, horizontalChatHeight),
-                BuildExpandedLayout(CompanionPlacement.Up, anchor, workArea, scale, verticalChatHeight),
-                BuildExpandedLayout(CompanionPlacement.Down, anchor, workArea, scale, verticalChatHeight),
+        // Blue window size is FIXED for its entire lifetime — never changes
+        Width = CollapsedWindowSize;
+        Height = CollapsedWindowSize;
             };
-
-            return candidates
-                .OrderBy(layout => layout.Overflow)
-                .ThenBy(layout => layout.Placement == CompanionPlacement.Left ? 0 :
-                                  layout.Placement == CompanionPlacement.Right ? 1 :
-                                  layout.Placement == CompanionPlacement.Up ? 2 : 3)
-                .First();
-        }
-
-        private CompanionLayout BuildExpandedLayout(CompanionPlacement placement, PointInt32 anchor, RectInt32 workArea, double scale, double chatHeight)
-        {
-            double windowWidth;
-            double windowHeight;
-            double characterLeft;
-            double characterTop;
-            double chatLeft;
-            double chatTop;
-
-            switch (placement)
+            _chatWindowCreated = true;
+            // Hide immediately so we can position before showing
+            unsafe
             {
-                case CompanionPlacement.Right:
-                    windowWidth = CharacterPadding + CharacterSize + CompanionGap + ChatWidth;
-                    windowHeight = Math.Max(chatHeight, CharacterSize + (CharacterPadding * 2));
-                    characterLeft = CharacterPadding;
-                    characterTop = windowHeight - CharacterSize - CharacterPadding;
-                    chatLeft = CharacterPadding + CharacterSize + CompanionGap;
-                    chatTop = 0;
-                    break;
-                case CompanionPlacement.Up:
-                    windowWidth = Math.Max(ChatWidth, CharacterSize + (CharacterPadding * 2));
-                    windowHeight = chatHeight + CompanionGap + CharacterSize + CharacterPadding;
-                    characterLeft = (windowWidth - CharacterSize) / 2;
-                    characterTop = chatHeight + CompanionGap;
-                    chatLeft = (windowWidth - ChatWidth) / 2;
-                    chatTop = 0;
-                    break;
-                case CompanionPlacement.Down:
-                    windowWidth = Math.Max(ChatWidth, CharacterSize + (CharacterPadding * 2));
-                    windowHeight = CharacterPadding + CharacterSize + CompanionGap + chatHeight;
-                    characterLeft = (windowWidth - CharacterSize) / 2;
-                    characterTop = CharacterPadding;
-                    chatLeft = (windowWidth - ChatWidth) / 2;
-                    chatTop = CharacterPadding + CharacterSize + CompanionGap;
-                    break;
-                default:
-                    windowWidth = ChatWidth + CompanionGap + CharacterSize + CharacterPadding;
-                    windowHeight = Math.Max(chatHeight, CharacterSize + (CharacterPadding * 2));
-                    characterLeft = ChatWidth + CompanionGap;
-                    characterTop = windowHeight - CharacterSize - CharacterPadding;
-                    chatLeft = 0;
-                    chatTop = 0;
-                    break;
-            }
-
-            var windowLeft = anchor.X - ((characterLeft + (CharacterSize / 2)) * scale);
-            var windowTop = anchor.Y - ((characterTop + (CharacterSize / 2)) * scale);
-            var overflow = CalculateOverflow(windowLeft, windowTop, windowWidth * scale, windowHeight * scale, workArea);
-
-            return new CompanionLayout(placement, windowWidth, windowHeight, windowLeft, windowTop, characterLeft, characterTop, chatLeft, chatTop, chatHeight, overflow);
-        }
-
-        private void ApplyLayout(
-            double windowWidth,
-            double windowHeight,
-            double windowLeft,
-            double windowTop,
-            double characterLeft,
-            double characterTop,
-            double chatLeft,
-            double chatTop,
-            double chatHeight,
-            RectInt32 workArea,
-            double scale)
-        {
-            var windowWidthPixels = windowWidth * scale;
-            var windowHeightPixels = windowHeight * scale;
-            windowLeft = ClampToRange(windowLeft, workArea.X + MonitorMargin, workArea.X + workArea.Width - windowWidthPixels - MonitorMargin);
-            windowTop = ClampToRange(windowTop, workArea.Y + MonitorMargin, workArea.Y + workArea.Height - windowHeightPixels - MonitorMargin);
-            var visibleCharacterPosition = ClampWindowPositionToKeepCharacterVisible(windowLeft, windowTop, characterLeft, characterTop, workArea, scale);
-            windowLeft = visibleCharacterPosition.X;
-            windowTop = visibleCharacterPosition.Y;
-
-            LayoutCanvas.Width = windowWidth;
-            LayoutCanvas.Height = windowHeight;
-            ChatPanel.Width = ChatWidth;
-            ChatPanel.Height = chatHeight;
-            Canvas.SetLeft(ChatPanel, chatLeft);
-            Canvas.SetTop(ChatPanel, chatTop);
-            Canvas.SetLeft(CharacterButton, characterLeft);
-            Canvas.SetTop(CharacterButton, characterTop);
-
-            // Use Width/Height instead of AppWindow.ResizeClient to avoid conflicts.
-            // Width/Height sets outer window size and WinUIEx handles it correctly,
-            // whereas ResizeClient sets client area causing misalignment.
-            Width = windowWidth;
-            Height = windowHeight;
-
-            AppWindow.Move(new PointInt32(
-                Convert.ToInt32(windowLeft),
-                Convert.ToInt32(windowTop)));
-            LayoutCanvas.MaxHeight = windowHeight;
-        }
-
-        private PointInt32 GetCharacterAnchorScreenPoint()
-        {
-            var scale = GetScale();
-
-            if (CharacterButton is not null)
-            {
-                // Get character position from Canvas (DIPs) - more reliable than TransformToVisual
-                var characterLeft = Canvas.GetLeft(CharacterButton);
-                var characterTop = Canvas.GetTop(CharacterButton);
-
-                // Handle NaN (default unset values)
-                if (double.IsNaN(characterLeft))
-                    characterLeft = CharacterPadding;
-                if (double.IsNaN(characterTop))
-                    characterTop = CharacterPadding;
-
-                // Calculate center point of the character
-                var characterCenterX = characterLeft + (CharacterSize / 2);
-                var characterCenterY = characterTop + (CharacterSize / 2);
-
-                // Convert to screen pixels: window position + (DIPs * scale)
-                return new PointInt32(
-                    AppWindow.Position.X + Convert.ToInt32(characterCenterX * scale),
-                    AppWindow.Position.Y + Convert.ToInt32(characterCenterY * scale));
-            }
-
-            var workArea = GetCurrentWorkArea();
-            var halfCharacter = Convert.ToInt32((CharacterSize / 2) * scale);
-            return new PointInt32(
-                workArea.X + workArea.Width - halfCharacter - Convert.ToInt32(80 * scale),
-                workArea.Y + workArea.Height - halfCharacter - Convert.ToInt32(40 * scale));
-        }
-
-        private RectInt32 GetCurrentWorkArea()
-        {
-            try
-            {
-                return DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
-            }
-            catch
-            {
-                return DisplayArea.Primary.WorkArea;
+                var hwnd = (HWND)_chatWindow.GetWindowHandle();
+                ShowWindow(hwnd, SW_HIDE);
             }
         }
 
-        private PointInt32 ClampCharacterAnchor(PointInt32 anchor, RectInt32 workArea, double scale)
+        var currentPos = AppWindow.Position;
+        var scale = GetScale();
+        var workArea = GetCurrentWorkArea();
+
+        // Blue window bounds (physical pixels)
+        var blueLeft = currentPos.X;
+        var blueTop = currentPos.Y;
+        var blueRight = blueLeft + (int)(CollapsedWindowSize * scale);
+        var blueBottom = blueTop + (int)(CollapsedWindowSize * scale);
+
+        // Available space right of Blue
+        var monitorRight = workArea.X + workArea.Width - (int)(MonitorMargin * scale);
+        var availableRight = monitorRight - blueRight;
+        var chatPhysicalWidth = (int)(ChatWidth * scale);
+
+        // Horizontal: prefer RIGHT, fall back to LEFT
+        int chatX;
+        if (availableRight >= chatPhysicalWidth)
         {
-            var halfCharacter = (CharacterSize / 2) * scale;
-            return new PointInt32(
-                Convert.ToInt32(ClampToRange(anchor.X, workArea.X + halfCharacter + MonitorMargin, workArea.X + workArea.Width - halfCharacter - MonitorMargin)),
-                Convert.ToInt32(ClampToRange(anchor.Y, workArea.Y + halfCharacter + MonitorMargin, workArea.Y + workArea.Height - halfCharacter - MonitorMargin)));
+            chatX = blueRight + (int)(CompanionGap * scale);
+        }
+        else
+        {
+            chatX = blueLeft - chatPhysicalWidth - (int)(CompanionGap * scale);
+            // Clamp to monitor left edge
+            if (chatX < workArea.X + (int)(MonitorMargin * scale))
+                chatX = (int)(workArea.X + MonitorMargin * scale);
         }
 
-        private static double CalculateOverflow(double left, double top, double width, double height, RectInt32 bounds)
+        // Vertical: align top with Blue, fill available space below
+        var availableBelow = (workArea.Y + workArea.Height - (int)(MonitorMargin * scale)) - blueTop;
+        var chatPhysicalHeight = Math.Min((int)(PreferredChatHeight * scale), availableBelow);
+        if (chatPhysicalHeight < (int)(MinChatHeight * scale))
+            chatPhysicalHeight = (int)(MinChatHeight * scale);
+
+        _chatWindow.Width = ChatWidth;
+        _chatWindow.Height = chatPhysicalHeight / scale;
+
+        unsafe
         {
-            var overflowLeft = Math.Max(0, bounds.X + MonitorMargin - left);
-            var overflowTop = Math.Max(0, bounds.Y + MonitorMargin - top);
-            var overflowRight = Math.Max(0, (left + width) - (bounds.X + bounds.Width - MonitorMargin));
-            var overflowBottom = Math.Max(0, (top + height) - (bounds.Y + bounds.Height - MonitorMargin));
-            return overflowLeft + overflowTop + overflowRight + overflowBottom;
+            var hwnd = (HWND)_chatWindow.GetWindowHandle();
+            SetWindowPos(hwnd, HWND.HWND_TOP,
+                chatX, blueTop,
+                chatPhysicalWidth, chatPhysicalHeight,
+                SWP_SHOWWINDOW | SWP_NOACTIVATE);
         }
 
-        private PointInt32 ClampCurrentWindowPositionToKeepCharacterVisible(double windowLeft, double windowTop)
+        Assistant.IsExpanded = true;
+        _chatWindowPositioned = true;
+
+        // Apply current pin state to ChatWindow
+        if (Assistant.IsPinned)
+            PinChatWindow();
+    }
+
+    /// <summary>
+    /// Collapse: hide the chat window. Blue window stays exactly where it is.
+    /// </summary>
+    internal void Collapse()
+    {
+        if (_chatWindowCreated && _chatWindowPositioned)
         {
-            var scale = GetScale();
-            var workArea = GetCurrentWorkArea();
-            var characterLeft = Canvas.GetLeft(CharacterButton);
-            var characterTop = Canvas.GetTop(CharacterButton);
-
-            if (double.IsNaN(characterLeft))
-                characterLeft = CharacterPadding;
-
-            if (double.IsNaN(characterTop))
-                characterTop = CharacterPadding;
-
-            return ClampWindowPositionToKeepCharacterVisible(windowLeft, windowTop, characterLeft, characterTop, workArea, scale);
-        }
-
-        private static PointInt32 ClampWindowPositionToKeepCharacterVisible(
-            double windowLeft,
-            double windowTop,
-            double characterLeft,
-            double characterTop,
-            RectInt32 workArea,
-            double scale)
-        {
-            var minWindowLeft = workArea.X + MonitorMargin - (characterLeft * scale);
-            var maxWindowLeft = workArea.X + workArea.Width - MonitorMargin - ((characterLeft + CharacterSize) * scale);
-            var minWindowTop = workArea.Y + MonitorMargin - (characterTop * scale);
-            var maxWindowTop = workArea.Y + workArea.Height - MonitorMargin - ((characterTop + CharacterSize) * scale);
-
-            return new PointInt32(
-                Convert.ToInt32(ClampToRange(windowLeft, minWindowLeft, maxWindowLeft)),
-                Convert.ToInt32(ClampToRange(windowTop, minWindowTop, maxWindowTop)));
-        }
-
-        private static double ClampToRange(double value, double min, double max)
-        {
-            if (max < min)
-                return min;
-
-            return Math.Min(Math.Max(value, min), max);
-        }
-
-		// Bool to Visibility
-		public Visibility BoolToVis(bool b) => b ? Visibility.Visible : Visibility.Collapsed;
-
-		// Bool to inverted visibility
-		public Visibility InvertBoolToVis(bool b) => b ? Visibility.Collapsed : Visibility.Visible;
-
-        private void Character_Tapped(object sender, TappedRoutedEventArgs e)
-        {
-            if (suppressNextCharacterTap)
+            unsafe
             {
-                suppressNextCharacterTap = false;
-                e.Handled = true;
-                return;
+                var hwnd = (HWND)_chatWindow.GetWindowHandle();
+                ShowWindow(hwnd, SW_HIDE);
             }
-
-            Assistant.IsExpanded = !Assistant.IsExpanded;
-            if (Assistant.IsExpanded)
-                Expand();
-            else
-                Collapse();
+            _chatWindowPositioned = false;
         }
 
-		private void Character_PointerPressed(object sender, PointerRoutedEventArgs e)
-		{
-            var pointer = e.GetCurrentPoint(CharacterButton);
-            if (!pointer.Properties.IsLeftButtonPressed)
-                return;
+        Assistant.IsExpanded = false;
+    }
 
-            SetCharacterTooltipEnabled(false);
-
-            if (!NativeHelper.GetCursorPos(out moveStartCursor))
-            {
-                SetCharacterTooltipEnabled(true);
-                return;
-            }
-
-            NativeHelper.GetWindowRect(this.GetWindowHandle(), out moveStartWindowRect);
-            isMovePointerPressed = true;
-            isMovingWindow = false;
-            CharacterButton.CapturePointer(e.Pointer);
-		}
-
-        private void Character_PointerMoved(object sender, PointerRoutedEventArgs e)
+    private RectInt32 GetCurrentWorkArea()
+    {
+        try
         {
-            if (!isMovePointerPressed)
-                return;
-
-            if (!NativeHelper.GetCursorPos(out var cursor))
-                return;
-
-            var deltaX = cursor.X - moveStartCursor.X;
-            var deltaY = cursor.Y - moveStartCursor.Y;
-
-            if (!isMovingWindow && Math.Abs(deltaX) < MoveDragThreshold && Math.Abs(deltaY) < MoveDragThreshold)
-                return;
-
-            isMovingWindow = true;
-            var nextPosition = ClampCurrentWindowPositionToKeepCharacterVisible(moveStartWindowRect.Left + deltaX, moveStartWindowRect.Top + deltaY);
-            AppWindow.Move(nextPosition);
-            e.Handled = true;
+            return DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
         }
-
-        private void Character_PointerReleased(object sender, PointerRoutedEventArgs e) => EndWindowMove(e);
-
-        private void Character_PointerCanceled(object sender, PointerRoutedEventArgs e) => EndWindowMove(e);
-
-        private void EndWindowMove(PointerRoutedEventArgs e)
+        catch
         {
-            var wasMovingWindow = isMovingWindow;
-
-            if (isMovePointerPressed)
-            {
-                CharacterButton.ReleasePointerCapture(e.Pointer);
-                e.Handled = wasMovingWindow;
-            }
-
-            isMovePointerPressed = false;
-            isMovingWindow = false;
-            suppressNextCharacterTap = wasMovingWindow;
-            SetCharacterTooltipEnabled(true);
+            return DisplayArea.Primary.WorkArea;
         }
+    }
 
-        private void SetCharacterTooltipEnabled(bool isEnabled)
+    private void Settings_Click(object sender, RoutedEventArgs e)
+    {
+        App.Current.OpenSettings();
+    }
+
+    private void Exit_Click(object sender, RoutedEventArgs e)
+    {
+        Application.Current.Exit();
+    }
+
+    private void Hide_Click(object sender, RoutedEventArgs e)
+    {
+        Collapse();
+    }
+
+    private void Character_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (suppressNextCharacterTap)
         {
-            ToolTipService.SetToolTip(CharacterButton, isEnabled ? CharacterTooltipText : null);
+            suppressNextCharacterTap = false;
+            return;
         }
 
-		private void TextBox_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
-		{
-            if (e.Key != VirtualKey.Enter)
-                return;
-
-            var shiftState = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift);
-            var isShiftDown = (shiftState & CoreVirtualKeyStates.Down) == CoreVirtualKeyStates.Down;
-            if (isShiftDown)
-                return;
-
-            e.Handled = true;
-
-            if (sender is TextBox textBox)
-                Assistant.CurrentText = textBox.Text;
-
-            if (!Assistant.SendPromptCommand.IsRunning && Assistant.SendPromptCommand.CanExecute(null))
-                Assistant.SendPromptCommand.Execute(null);
-		}
-
-		private void Exit_Click(object sender, RoutedEventArgs e) => Application.Current.Exit();
-
-		private void Hide_Click(object sender, RoutedEventArgs e)
-		{
-            Assistant.IsExpanded = false;
+        if (Assistant.IsExpanded)
             Collapse();
-            Activate();
-		}
-	}
+        else
+            Expand();
+    }
+
+    private void SetCharacterTooltipEnabled(bool isEnabled)
+    {
+        ToolTipService.SetToolTip(CharacterButton, isEnabled ? CharacterTooltipText : null);
+    }
+
+    // === Drag support ===
+
+    private void Character_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        // Hide tooltip while user interacts with Blue (drag or click)
+        SetCharacterTooltipEnabled(false);
+
+        moveStartCursor = new NativeHelper.Point();
+        if (!NativeHelper.GetCursorPos(out moveStartCursor))
+            return;
+
+        NativeHelper.GetWindowRect(this.GetWindowHandle(), out moveStartWindowRect);
+        isMovePointerPressed = true;
+        isMovingWindow = false;
+        CharacterButton.CapturePointer(e.Pointer);
+
+        // Capture chat window offset from Blue at drag start
+        if (_chatWindowCreated && _chatWindowPositioned)
+        {
+            var chatHwnd = (HWND)_chatWindow.GetWindowHandle();
+            NativeHelper.GetWindowRect(chatHwnd, out NativeHelper.RECT chatRect);
+            _chatDragOffsetX = chatRect.Left - moveStartWindowRect.Left;
+            _chatDragOffsetY = chatRect.Top - moveStartWindowRect.Top;
+        }
+    }
+
+    private void Character_PointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (!isMovePointerPressed)
+            return;
+
+        if (!NativeHelper.GetCursorPos(out var cursor))
+            return;
+
+        var deltaX = cursor.X - moveStartCursor.X;
+        var deltaY = cursor.Y - moveStartCursor.Y;
+
+        if (!isMovingWindow && Math.Abs(deltaX) < MoveDragThreshold && Math.Abs(deltaY) < MoveDragThreshold)
+            return;
+
+        isMovingWindow = true;
+        AppWindow.Move(new PointInt32(moveStartWindowRect.Left + deltaX, moveStartWindowRect.Top + deltaY));
+
+        // ChatWindow follows Blue with the same drag offset
+        if (_chatWindowCreated && _chatWindowPositioned)
+        {
+            unsafe
+            {
+                var chatHwnd = (HWND)_chatWindow.GetWindowHandle();
+                SetWindowPos(chatHwnd, HWND.HWND_TOP,
+                    moveStartWindowRect.Left + deltaX + _chatDragOffsetX,
+                    moveStartWindowRect.Top + deltaY + _chatDragOffsetY,
+                    0, 0,
+                    SWP_NOSIZE | SWP_NOACTIVATE);
+            }
+        }
+
+        e.Handled = true;
+    }
+
+    private void Character_PointerReleased(object sender, PointerRoutedEventArgs e) => EndWindowMove(e);
+    private void Character_PointerCanceled(object sender, PointerRoutedEventArgs e) => EndWindowMove(e);
+
+    private void EndWindowMove(PointerRoutedEventArgs e)
+    {
+        var wasMovingWindow = isMovingWindow;
+
+        if (isMovePointerPressed)
+        {
+            CharacterButton.ReleasePointerCapture(e.Pointer);
+            e.Handled = wasMovingWindow;
+        }
+
+        isMovePointerPressed = false;
+        isMovingWindow = false;
+        suppressNextCharacterTap = wasMovingWindow;
+        SetCharacterTooltipEnabled(true);
+
+        // Re-position ChatWindow after drag ends (in case we moved between monitors)
+        if (_chatWindowCreated && _chatWindowPositioned && _chatWindow is not null && wasMovingWindow)
+        {
+            PositionChatWindowAfterMove();
+        }
+    }
+
+    /// <summary>
+    /// Re-position the chat window after Blue is dragged to a new location.
+    /// Re-evaluates LEFT/RIGHT placement based on the new monitor.
+    /// </summary>
+    private void PositionChatWindowAfterMove()
+    {
+        var currentPos = AppWindow.Position;
+        var scale = GetScale();
+        var workArea = GetCurrentWorkArea();
+
+        var blueLeft = currentPos.X;
+        var blueTop = currentPos.Y;
+        var blueRight = blueLeft + (int)(CollapsedWindowSize * scale);
+
+        var monitorRight = workArea.X + workArea.Width - (int)(MonitorMargin * scale);
+        var availableRight = monitorRight - blueRight;
+        var chatPhysicalWidth = (int)(ChatWidth * scale);
+
+        int chatX;
+        if (availableRight >= chatPhysicalWidth)
+        {
+            chatX = blueRight + (int)(CompanionGap * scale);
+        }
+        else
+        {
+            chatX = blueLeft - chatPhysicalWidth - (int)(CompanionGap * scale);
+            if (chatX < workArea.X + (int)(MonitorMargin * scale))
+                chatX = (int)(workArea.X + MonitorMargin * scale);
+        }
+
+        var availableBelow = (workArea.Y + workArea.Height - (int)(MonitorMargin * scale)) - blueTop;
+        var chatPhysicalHeight = Math.Min((int)(PreferredChatHeight * scale), availableBelow);
+        if (chatPhysicalHeight < (int)(MinChatHeight * scale))
+            chatPhysicalHeight = (int)(MinChatHeight * scale);
+
+        unsafe
+        {
+            var hwnd = (HWND)_chatWindow.GetWindowHandle();
+            SetWindowPos(hwnd, HWND.HWND_TOP,
+                chatX, blueTop,
+                chatPhysicalWidth, chatPhysicalHeight,
+                SWP_NOACTIVATE);
+        }
+    }
 }
