@@ -130,24 +130,16 @@ and making sure Ollama is running.
 - Stabilize packaging and distribution
 - Improve UX and system-tray behavior
 
-## Documentation
-
-- [README in Spanish](./README.es.md)
-- [README in English](./README.en.md)
-- [Tester Quickstart (ES)](./TESTER-QUICKSTART.es.md)
-- [Tester Quickstart (EN)](./TESTER-QUICKSTART.en.md)
-- [Known Issues (ES)](./KNOWN-ISSUES.es.md)
-- [Known Issues (EN)](./KNOWN-ISSUES.en.md)
-- [Packaging Notes (ES)](./PACKAGING.es.md)
-- [Packaging Notes (EN)](./PACKAGING.en.md)
-
 ## Repository structure
 
 ```text
-Blue.Core/    Core logic
-Blue/         Main desktop app
-CubeKit.UI/     UI support library
+BlueAssistant.sln
+├── Blue/             Main desktop app (WinUI 3, unpackaged)
+├── Blue.Core/        Core logic, services, view models
+└── Blue/Distribución/  Distribution files
 ```
+
+See [DEPENDENCIES.md](./DEPENDENCIES.md) for build and runtime requirements.
 
 ## Support the project
 
