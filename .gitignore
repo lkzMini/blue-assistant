@@ -361,4 +361,14 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-/Clippy/Tray
+# Blue backup snapshots
+/bluebackup/
+
+# OpenCode skill registry
+.atl/
+
+# Engram persistent memory
+.engram/
+
+# Distribution package
+/dist/

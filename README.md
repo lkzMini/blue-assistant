@@ -11,7 +11,7 @@ It stays on screen as a movable character and lets you chat with a local model r
 
 ## Preview
 
-![Blue Assistant preview](./Clippy/Assets/image.png)
+![Blue Assistant preview](./Blue/Assets/image.png)
 
 ### Current features
 
@@ -76,9 +76,9 @@ Open Blue from the packaged build, or run it from Visual Studio if you are build
 Blue currently expects these files:
 
 ```text
-Clippy/Assets/Dino/Dino.png
-Clippy/Assets/Dino/Dino.Idle.png
-Clippy/Assets/Dino/Dino.Happy.png
+Blue/Assets/Dino/Dino.png
+Blue/Assets/Dino/Dino.Idle.png
+Blue/Assets/Dino/Dino.Happy.png
 ```
 
 State mapping:
@@ -130,24 +130,16 @@ and making sure Ollama is running.
 - Stabilize packaging and distribution
 - Improve UX and system-tray behavior
 
-## Documentation
-
-- [README in Spanish](./README.es.md)
-- [README in English](./README.en.md)
-- [Tester Quickstart (ES)](./TESTER-QUICKSTART.es.md)
-- [Tester Quickstart (EN)](./TESTER-QUICKSTART.en.md)
-- [Known Issues (ES)](./KNOWN-ISSUES.es.md)
-- [Known Issues (EN)](./KNOWN-ISSUES.en.md)
-- [Packaging Notes (ES)](./PACKAGING.es.md)
-- [Packaging Notes (EN)](./PACKAGING.en.md)
-
 ## Repository structure
 
 ```text
-Clippy.Core/    Core logic
-Clippy/         Main desktop app
-CubeKit.UI/     UI support library
+BlueAssistant.sln
+├── Blue/             Main desktop app (WinUI 3, unpackaged)
+├── Blue.Core/        Core logic, services, view models
+└── Blue/Distribución/  Distribution files
 ```
+
+See [DEPENDENCIES.md](./DEPENDENCIES.md) for build and runtime requirements.
 
 ## Support the project
 

@@ -1,0 +1,252 @@
+using Blue.Core.Classes;
+using Blue.Core.Services;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Text;
+using System.Threading.Tasks;
+using System.Threading;
+using Blue.Core.Interfaces;
+using Blue.Core.Enums;
+using Blue.Core.ViewModels.Messages;
+using System.Collections.ObjectModel;
+using Blue.Core.Factories;
+using System.Linq.Expressions;
+using System.Diagnostics;
+using System.IO;
+using System.Net.Http;
+
+namespace Blue.Core.ViewModels
+{
+	public partial class AssistantViewModel : ObservableObject
+	{
+		private const string ThinkingCharacterImageFileName = "Dino.png";
+		private const string IdleCharacterImageFileName = "Dino.Idle.png";
+		private const string HappyCharacterImageFileName = "Dino.Happy.png";
+		private const string OllamaEndpoint = "http://localhost:11434";
+		private const string RequiredOllamaModel = "phi3:latest";
+
+		public ObservableCollection<MessageViewModel> MessagesVM = new();
+		public ObservableCollection<IMessage> Messages = new();
+
+		[ObservableProperty]
+        private bool isExpanded = true;
+
+        [ObservableProperty]
+        private bool isPinned = true;
+
+		[ObservableProperty]
+		private string currentText = "";
+
+		[ObservableProperty]
+		private DateTime updatedAt = DateTime.Now;
+
+		[ObservableProperty]
+		private string characterImageSource = GetCharacterImageSource(CharacterVisualState.Idle);
+
+		public IChatService ChatService;
+
+        public ISettingsService SettingsService;
+
+        public AssistantViewModel(IChatService chatService, ISettingsService settingsService)
+        {
+            ChatService = chatService;
+            SettingsService = settingsService;
+            isPinned = SettingsService.AutoPin;
+			Initialize();
+        }
+
+		private void Initialize()
+		{
+			SetupChat();
+		}
+
+		/// <summary>
+		/// Checks if Ollama is reachable. Must be called from UI thread.
+		/// After the await, the continuation may run on a thread-pool thread,
+		/// so this should only be used from fire-and-forget startup contexts
+		/// where a silent failure to show the warning is acceptable.
+		/// </summary>
+		public async Task<bool> CheckOllamaOnStartup()
+		{
+			var ollamaRunning = await ChatService.HealthCheckAsync();
+			if (!ollamaRunning)
+				ShowOllamaResult(false);
+			return ollamaRunning;
+		}
+
+		/// <summary>
+		/// Adds an Ollama status message. Must be called from the UI thread.
+		/// </summary>
+		public void ShowOllamaResult(bool isRunning)
+		{
+			if (isRunning)
+			{
+				AddMessage(new Message(Role.System,
+					"✅ Ollama is running and reachable at localhost:11434."));
+			}
+			else
+			{
+				AddMessage(new Message(Role.System,
+					"⚠️ Ollama is not running or not reachable.\n"
+					+ "Make sure Ollama is installed and running. "
+					+ "Look for Ollama in your system tray or taskbar.\n\n"
+					+ "If it's not running, open a terminal and run:\n"
+					+ "  ollama serve\n\n"
+					+ "Then make sure the model is installed:\n"
+					+ "  ollama pull phi3:latest"));
+			}
+		}
+
+		/// <summary>
+		/// Pure network check — no UI work. Safe to call from any thread.
+		/// </summary>
+		public async Task<bool> IsOllamaRunningAsync()
+		{
+			return await ChatService.HealthCheckAsync();
+		}
+
+		private void SetupChat()
+		{
+			// System prompt is internal AI context — not shown in the visible chat
+			Messages.Add(new Message(Role.System, Constants.DEFAULT_SYSTEM_PROMPT));
+			AddMessage(new Message(Role.Assistant, Constants.FIRST_ASSISTANT_MESSAGE));
+		}
+
+		private MessageViewModel AddMessage(IMessage message)
+		{
+			var ViewModel = MessageFactory.GetMessageViewModel(message);
+			MessagesVM.Add(ViewModel);
+			Messages.Add(message);
+			return ViewModel;
+		}
+
+		private MessageViewModel AddMessageViewModel(IMessage message)
+		{
+			var ViewModel = MessageFactory.GetMessageViewModel(message);
+			MessagesVM.Add(ViewModel);
+			return ViewModel;
+		}
+
+		private enum CharacterVisualState
+		{
+			Idle,
+			Thinking,
+			Happy
+		}
+
+		private static string GetCharacterImageSource(CharacterVisualState state)
+		{
+			var fileName = state switch
+			{
+				CharacterVisualState.Idle => IdleCharacterImageFileName,
+				CharacterVisualState.Thinking => ThinkingCharacterImageFileName,
+				CharacterVisualState.Happy => HappyCharacterImageFileName,
+				_ => ThinkingCharacterImageFileName
+			};
+
+			var assetPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Dino", fileName);
+			if (!File.Exists(assetPath))
+				fileName = ThinkingCharacterImageFileName;
+
+			return $"ms-appx:///Assets/Dino/{fileName}";
+		}
+
+		private void SetCharacterVisualState(CharacterVisualState state) => CharacterImageSource = GetCharacterImageSource(state);
+
+		[RelayCommand(IncludeCancelCommand = true)]
+		public async Task SendPrompt(CancellationToken cancellationToken)
+		{
+			try
+			{
+				if (!String.IsNullOrEmpty(CurrentText))
+				{
+					AddMessage(new Message(Role.User, CurrentText)); // update UI here
+					CurrentText = "";
+					await Task.Delay(300);
+
+					var messageVM = AddMessageViewModel(new Message(Role.Assistant, "")) as AssistantMessageViewModel;
+					SetCharacterVisualState(CharacterVisualState.Thinking);
+					UpdatedAt = DateTime.Now;
+					messageVM?.StartStreamText(cancellationToken);
+
+					try
+					{
+						await foreach (var chunk in ChatService.StreamChatAsync(Messages, cancellationToken))
+							messageVM?.AddStreamText(chunk);
+					}
+					catch (TaskCanceledException)
+					{
+						SetCharacterVisualState(CharacterVisualState.Idle);
+						return; // Task cancelled so it is ok
+					}
+					catch (Exception e)
+					{
+						var failureMessage = GetChatFailureMessage(e);
+						if (messageVM is not null)
+						{
+							messageVM.EndStreamText();
+							messageVM.MessageText = failureMessage;
+						}
+						else
+						{
+							AddMessageViewModel(new Message(Role.Assistant, failureMessage));
+						}
+
+						SetCharacterVisualState(CharacterVisualState.Idle);
+						return;
+					}
+
+					messageVM?.EndStreamText();
+					if (messageVM is not null && !String.IsNullOrEmpty(messageVM.MessageText))
+					{
+						Messages.Add(new Message(Role.Assistant, messageVM.MessageText));
+						SetCharacterVisualState(CharacterVisualState.Happy);
+					}
+					else
+					{
+						SetCharacterVisualState(CharacterVisualState.Idle);
+					}
+				}
+			}
+			catch (Exception e)
+			{
+				Debug.WriteLine(e.Message);
+			}
+		}
+
+		private static string GetChatFailureMessage(Exception exception)
+		{
+			var message = exception.Message ?? string.Empty;
+
+			if (ContainsIgnoreCase(message, "404") || ContainsIgnoreCase(message, "not found") || ContainsIgnoreCase(message, "model"))
+			{
+				return $"I couldn't find the model '{RequiredOllamaModel}'. Open a terminal and run:\n  ollama pull {RequiredOllamaModel}\nThen try again.";
+			}
+
+			if (exception is HttpRequestException ||
+				ContainsIgnoreCase(message, "connection") ||
+				ContainsIgnoreCase(message, "refused") ||
+				ContainsIgnoreCase(message, "unreachable"))
+			{
+				return $"I can't reach Ollama at {OllamaEndpoint}.\n\nCheck that Ollama is running (look for Ollama in your system tray or taskbar).\nIf it's not running, open a terminal and run:\n  ollama serve\n\nThen make sure the model is installed:\n  ollama pull {RequiredOllamaModel}";
+			}
+
+			return $"I couldn't get a response from Ollama. Make sure Ollama is running at {OllamaEndpoint} and the '{RequiredOllamaModel}' model is installed.";
+		}
+
+		private static bool ContainsIgnoreCase(string source, string value) =>
+			source.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
+
+		[RelayCommand]
+        private void RefreshChat()
+		{
+			MessagesVM.Clear();
+			Messages.Clear();
+			SetupChat();
+			SetCharacterVisualState(CharacterVisualState.Idle);
+		}
+    }
+}

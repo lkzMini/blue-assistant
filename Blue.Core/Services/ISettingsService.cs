@@ -1,0 +1,15 @@
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace Blue.Core.Services
+{
+    public interface ISettingsService
+    {
+        public bool AutoPin { get; set; }
+        public bool EnableTray { get; set; }
+        public bool TranslucentBackground { get; set; }
+        public bool KeyboardEnabled { get; set; }
+        public int Tokens { get; set; }
+    }
+}
