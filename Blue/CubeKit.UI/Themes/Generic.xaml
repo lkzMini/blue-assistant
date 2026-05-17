@@ -16,8 +16,8 @@
                               Height="{TemplateBinding Height}"
                               MaxWidth="{TemplateBinding MaxWidth}"
                               MaxHeight="{TemplateBinding MaxHeight}"
-                              MinWidth="{TemplateBinding MinWidth}"
-                              MinHeight="{TemplateBinding MinHeight}"
+                              MinWidth="16"
+                              MinHeight="16"
                               Margin="{TemplateBinding Margin}"/>
                 </ControlTemplate>
             </Setter.Value>

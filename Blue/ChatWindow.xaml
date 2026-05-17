@@ -47,12 +47,20 @@
 
         <Grid x:Name="ChatPanel" Width="360">
             <Grid.RowDefinitions>
+                <RowDefinition Height="20" />
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="auto" />
                 <RowDefinition Height="36" />
             </Grid.RowDefinitions>
 
-            <ListView Grid.Row="0" ItemTemplateSelector="{StaticResource MessageTemplateSelector}" SelectionMode="None" ItemsSource="{x:Bind Assistant.MessagesVM, Mode=OneWay}">
+            <Grid Grid.Row="0" x:Name="DragHandle" Background="Transparent"
+                  PointerPressed="DragHandle_PointerPressed"
+                  PointerMoved="DragHandle_PointerMoved"
+                  PointerReleased="DragHandle_PointerReleased"
+                  PointerCanceled="DragHandle_PointerCanceled">
+            </Grid>
+
+            <ListView Grid.Row="1" ItemTemplateSelector="{StaticResource MessageTemplateSelector}" SelectionMode="None" ItemsSource="{x:Bind Assistant.MessagesVM, Mode=OneWay}">
                 <ListView.ItemsPanel>
                     <ItemsPanelTemplate>
                         <ItemsStackPanel ItemsUpdatingScrollMode="KeepLastItemInView" VerticalAlignment="Bottom"/>
@@ -72,7 +80,7 @@
                 </ListView.ItemContainerTransitions>
             </ListView>
 
-            <Grid Grid.Row="1">
+            <Grid Grid.Row="2">
                 <ToolkitControls:DropShadowPanel BlurRadius="16.0" ShadowOpacity="0.43" IsMasked="True" CornerRadius="8" OffsetX="0.0" OffsetY="0.0" Color="Black">
                     <Grid ColumnSpacing="4" BorderBrush="{ThemeResource MicaBorderBrush}" Padding="8" BorderThickness="1" Background="{ThemeResource MicaBrush}" CornerRadius="8">
                         <Grid.ColumnDefinitions>
@@ -98,13 +106,17 @@
                 </ToolkitControls:DropShadowPanel>
             </Grid>
 
-            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Left" VerticalAlignment="Bottom">
-                <Button Click="Settings_Click" Foreground="{ThemeResource SystemAccentColorLight2}" Style="{ThemeResource SettingsToolbarButton}" ToolTipService.ToolTip="Open settings"/>
-                <AppBarSeparator/>
-                <Button Click="Hide_Click" Style="{ThemeResource ToolbarButton}" Padding="0" Foreground="{ThemeResource SystemAccentColorLight2}" Height="32" Width="40" ToolTipService.ToolTip="Collapse to character. Click Blue to reopen.">
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Left" VerticalAlignment="Center">
+                <Button Click="Settings_Click" Style="{ThemeResource ToolbarButton}" Height="32" Width="40" ToolTipService.ToolTip="Open settings">
+                    <icons:FluentSymbolIcon Symbol="Settings20"/>
+                </Button>
+                <Button Click="Hide_Click" Style="{ThemeResource ToolbarButton}" Padding="0" Height="32" Width="40" ToolTipService.ToolTip="Collapse to character. Click Blue to reopen.">
                     <icons:FluentSymbolIcon Symbol="EyeHide20" />
                 </Button>
                 <ToggleButton IsChecked="{x:Bind Assistant.IsPinned, Mode=TwoWay}" Style="{ThemeResource PinToggleButton}" Height="32" Width="40" ToolTipService.ToolTip="Always on top"/>
+                <ToggleButton x:Name="FollowToggle" Height="32" Width="40" Checked="FollowToggle_Checked" Unchecked="FollowToggle_Unchecked" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Chat follows Blue">
+                    <icons:FluentSymbolIcon x:Name="FollowIcon" Symbol="Link20"/>
+                </ToggleButton>
                 <Button Command="{x:Bind Assistant.RefreshChatCommand}" Style="{ThemeResource RefreshButton}" Height="32" Width="40" ToolTipService.ToolTip="Restart chat"/>
             </StackPanel>
         </Grid>

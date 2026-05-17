@@ -58,6 +58,7 @@ public sealed partial class MainWindow : WindowEx
     private bool _chatWindowPositioned;
     private int _chatDragOffsetX;
     private int _chatDragOffsetY;
+    private bool _chatFollowsBlue = true;
 
     public MainWindow()
     {
@@ -220,19 +221,16 @@ public sealed partial class MainWindow : WindowEx
                 _chatWindowCreated = false;
                 _chatWindowPositioned = false;
                 if (Assistant.IsExpanded)
-        Assistant.IsExpanded = false;
+                    Assistant.IsExpanded = false;
 
-        // Blue window size is FIXED for its entire lifetime — never changes
-        Width = CollapsedWindowSize;
-        Height = CollapsedWindowSize;
+                // Blue window size is FIXED for its entire lifetime — never changes
+                Width = CollapsedWindowSize;
+                Height = CollapsedWindowSize;
             };
             _chatWindowCreated = true;
-            // Hide immediately so we can position before showing
-            unsafe
-            {
-                var hwnd = (HWND)_chatWindow.GetWindowHandle();
-                ShowWindow(hwnd, SW_HIDE);
-            }
+            // The native HWND is created by InitializeComponent() in ChatWindow constructor.
+            // We do NOT hide here — let the HWND be fully created.
+            // We position and show in one shot below.
         }
 
         var currentPos = AppWindow.Position;
@@ -264,22 +262,62 @@ public sealed partial class MainWindow : WindowEx
                 chatX = (int)(workArea.X + MonitorMargin * scale);
         }
 
-        // Vertical: align top with Blue, fill available space below
-        var availableBelow = (workArea.Y + workArea.Height - (int)(MonitorMargin * scale)) - blueTop;
-        var chatPhysicalHeight = Math.Min((int)(PreferredChatHeight * scale), availableBelow);
-        if (chatPhysicalHeight < (int)(MinChatHeight * scale))
-            chatPhysicalHeight = (int)(MinChatHeight * scale);
+        // Vertical: position below Blue, elevate above if insufficient room below
+        var workAreaTopWithMargin = workArea.Y + (int)(MonitorMargin * scale);
+        var workAreaBottomWithMargin = workArea.Y + workArea.Height - (int)(MonitorMargin * scale);
+        var availableBelow = workAreaBottomWithMargin - blueBottom;
+        var availableAbove = blueTop - workAreaTopWithMargin;
+        var preferredHeight = (int)(PreferredChatHeight * scale);
+        var minHeight = (int)(MinChatHeight * scale);
 
-        _chatWindow.Width = ChatWidth;
-        _chatWindow.Height = chatPhysicalHeight / scale;
+        int chatY;
+        int chatPhysicalHeight;
+
+        if (availableBelow >= minHeight)
+        {
+            // Enough room below — position below Blue
+            chatY = blueBottom + (int)(CompanionGap * scale);
+            chatPhysicalHeight = Math.Min(preferredHeight, availableBelow);
+        }
+        else
+        {
+            // Not enough below — check above (elevate behavior)
+            var availableAboveWithGap = availableAbove - (int)(CompanionGap * scale);
+            if (availableAboveWithGap >= minHeight)
+            {
+                chatPhysicalHeight = Math.Min(preferredHeight, availableAboveWithGap);
+                chatY = blueTop - (int)(CompanionGap * scale) - chatPhysicalHeight;
+            }
+            else
+            {
+                // Neither side fits — use the larger space
+                if (availableBelow >= availableAbove)
+                {
+                    chatY = blueBottom + (int)(CompanionGap * scale);
+                    chatPhysicalHeight = Math.Max(minHeight, availableBelow);
+                }
+                else
+                {
+                    chatY = workAreaTopWithMargin;
+                    chatPhysicalHeight = Math.Min(preferredHeight, availableAbove);
+                    chatPhysicalHeight = Math.Max(chatPhysicalHeight, minHeight);
+                }
+            }
+        }
+
+        // Clamp as safety net (uses computed chatY, not blueTop)
+        int finalX = chatX;
+        int finalY = chatY;
+        ClampToWorkArea(ref finalX, ref finalY, chatPhysicalWidth, chatPhysicalHeight);
+
+        // Use WinUI positioning API (works regardless of HWND state)
+        _chatWindow.AppWindow.Move(new PointInt32(finalX, finalY));
+        _chatWindow.AppWindow.Resize(new SizeInt32(chatPhysicalWidth, chatPhysicalHeight));
 
         unsafe
         {
             var hwnd = (HWND)_chatWindow.GetWindowHandle();
-            SetWindowPos(hwnd, HWND.HWND_TOP,
-                chatX, blueTop,
-                chatPhysicalWidth, chatPhysicalHeight,
-                SWP_SHOWWINDOW | SWP_NOACTIVATE);
+            ShowWindow(hwnd, SW_SHOWNA);
         }
 
         Assistant.IsExpanded = true;
@@ -397,15 +435,21 @@ public sealed partial class MainWindow : WindowEx
         isMovingWindow = true;
         AppWindow.Move(new PointInt32(moveStartWindowRect.Left + deltaX, moveStartWindowRect.Top + deltaY));
 
-        // ChatWindow follows Blue with the same drag offset
-        if (_chatWindowCreated && _chatWindowPositioned)
+        // ChatWindow follows Blue with the same drag offset (only when not detached)
+        if (_chatWindowCreated && _chatWindowPositioned && _chatFollowsBlue)
         {
             unsafe
             {
                 var chatHwnd = (HWND)_chatWindow.GetWindowHandle();
+                int chatX = moveStartWindowRect.Left + deltaX + _chatDragOffsetX;
+                int chatY = moveStartWindowRect.Top + deltaY + _chatDragOffsetY;
+                int chatW = 0, chatH = 0;
+                NativeHelper.GetWindowRect(chatHwnd, out NativeHelper.RECT chatRect);
+                chatW = chatRect.Right - chatRect.Left;
+                chatH = chatRect.Bottom - chatRect.Top;
+                ClampToWorkArea(ref chatX, ref chatY, chatW, chatH);
                 SetWindowPos(chatHwnd, HWND.HWND_TOP,
-                    moveStartWindowRect.Left + deltaX + _chatDragOffsetX,
-                    moveStartWindowRect.Top + deltaY + _chatDragOffsetY,
+                    chatX, chatY,
                     0, 0,
                     SWP_NOSIZE | SWP_NOACTIVATE);
             }
@@ -433,10 +477,35 @@ public sealed partial class MainWindow : WindowEx
         SetCharacterTooltipEnabled(true);
 
         // Re-position ChatWindow after drag ends (in case we moved between monitors)
-        if (_chatWindowCreated && _chatWindowPositioned && _chatWindow is not null && wasMovingWindow)
+        if (_chatWindowCreated && _chatWindowPositioned && _chatWindow is not null && wasMovingWindow && _chatFollowsBlue)
         {
             PositionChatWindowAfterMove();
         }
+    }
+
+    private void ClampToWorkArea(ref int x, ref int y, int width, int height)
+    {
+        var scale = GetScale();
+        var workArea = GetCurrentWorkArea();
+        var margin = (int)(MonitorMargin * scale);
+
+        var minX = workArea.X + margin;
+        var maxX = workArea.X + workArea.Width - width - margin;
+        if (x < minX) x = minX;
+        if (x > maxX) x = maxX;
+
+        var minY = workArea.Y + margin;
+        var maxY = workArea.Y + workArea.Height - height - margin;
+        if (y < minY) y = minY;
+        if (y > maxY) y = maxY;
+    }
+
+    /// <summary>
+    /// Set whether the chat window follows Blue when dragged.
+    /// </summary>
+    public void SetChatFollowsBlue(bool follows)
+    {
+        _chatFollowsBlue = follows;
     }
 
     /// <summary>
@@ -469,16 +538,57 @@ public sealed partial class MainWindow : WindowEx
                 chatX = (int)(workArea.X + MonitorMargin * scale);
         }
 
-        var availableBelow = (workArea.Y + workArea.Height - (int)(MonitorMargin * scale)) - blueTop;
-        var chatPhysicalHeight = Math.Min((int)(PreferredChatHeight * scale), availableBelow);
-        if (chatPhysicalHeight < (int)(MinChatHeight * scale))
-            chatPhysicalHeight = (int)(MinChatHeight * scale);
+        // Vertical: position below Blue, elevate above if insufficient room below
+        var workAreaTopWithMargin = workArea.Y + (int)(MonitorMargin * scale);
+        var workAreaBottomWithMargin = workArea.Y + workArea.Height - (int)(MonitorMargin * scale);
+        var blueBottom = blueTop + (int)(CollapsedWindowSize * scale);
+        var availableBelow = workAreaBottomWithMargin - blueBottom;
+        var availableAbove = blueTop - workAreaTopWithMargin;
+        var preferredHeight = (int)(PreferredChatHeight * scale);
+        var minHeight = (int)(MinChatHeight * scale);
+
+        int chatY;
+        int chatPhysicalHeight;
+
+        if (availableBelow >= minHeight)
+        {
+            chatY = blueBottom + (int)(CompanionGap * scale);
+            chatPhysicalHeight = Math.Min(preferredHeight, availableBelow);
+        }
+        else
+        {
+            var availableAboveWithGap = availableAbove - (int)(CompanionGap * scale);
+            if (availableAboveWithGap >= minHeight)
+            {
+                chatPhysicalHeight = Math.Min(preferredHeight, availableAboveWithGap);
+                chatY = blueTop - (int)(CompanionGap * scale) - chatPhysicalHeight;
+            }
+            else
+            {
+                if (availableBelow >= availableAbove)
+                {
+                    chatY = blueBottom + (int)(CompanionGap * scale);
+                    chatPhysicalHeight = Math.Max(minHeight, availableBelow);
+                }
+                else
+                {
+                    chatY = workAreaTopWithMargin;
+                    chatPhysicalHeight = Math.Min(preferredHeight, availableAbove);
+                    chatPhysicalHeight = Math.Max(chatPhysicalHeight, minHeight);
+                }
+            }
+        }
+
+        // Clamp as safety net (uses computed chatY, not blueTop)
+        int finalX = chatX;
+        int finalY = chatY;
+        ClampToWorkArea(ref finalX, ref finalY, chatPhysicalWidth, chatPhysicalHeight);
 
         unsafe
         {
             var hwnd = (HWND)_chatWindow.GetWindowHandle();
             SetWindowPos(hwnd, HWND.HWND_TOP,
-                chatX, blueTop,
+                finalX, finalY,
                 chatPhysicalWidth, chatPhysicalHeight,
                 SWP_NOACTIVATE);
         }
